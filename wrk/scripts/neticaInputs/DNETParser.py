@@ -86,7 +86,7 @@ class parseDNET(object):
     
     def parseSingleLineStruct(self, line):
         
-        # parse a line like 
+        # parse a line like
         # nodefont = font {shape= "Arial"; size= 10;};
         #
         # return as a key nodefont and a dictionary 
