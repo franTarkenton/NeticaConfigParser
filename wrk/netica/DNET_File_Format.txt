@@ -1,0 +1,2356 @@
+
+                                               98-03-29
+                   DNET-1 FILE FORMAT          Copyright 1992-1998 by Norsys Software Corp.
+                   ------------------
+
+
+CONTENTS
+--------
+
+  CONTENTS
+  INTRODUCTION
+  TUTORIAL BY EXAMPLES
+    Inheritance
+  NODE TYPES
+  "DISCONNECTED" NODES
+    Example
+  VISUAL NET
+    Coordinate System
+  FILE IDENTIFIER
+  LEVELS LIST
+  BNF GRAMMAR
+  NAMES
+  INHERITANCE
+  LIST OF FIELDS
+  FIELD DESCRIPTIONS
+    BNET FIELDS
+    BNODE FIELDS
+    VNET FIELDS
+    VNODE FIELDS
+    VLINK FIELDS
+  REQUIRED FIELDS
+  FILE ORDER
+  WHITESPACE
+  SYNTAX OF <STRING>
+  PARSING TESTS
+  FEEDBACK
+  REFERENCES
+  EXAMPLES OF DNETS
+
+====================================================================================
+
+
+INTRODUCTION
+------------
+
+This document describes the DNET file format.  It is designed to represent
+causal networks, belief networks (aka BNs, Bayesian networks, causal
+probabilistic networks), influence diagrams, decision networks (DNs), finite
+and infinite horizon Markov decision processes (MDPs), and partially
+observable MPDs (POMDPs).  It can deal with continuous or discrete variables,
+probabilistic or deterministic relationships, and can represent relationships
+using tables or equations.  It optionally may include information about the
+layout and visual appearance of the network.  It has special features for
+representing sets of nodes distributed over time or space, and the
+relationships between them.  It has an optional inheritance system, 
+which can reduce file size considerably and produce more readable files 
+for human editing.  It has a special representation for "disconnected" nodes, 
+which makes it easier to develop libraries of node types.
+
+DNET files are pure ascii text files, and the format is designed to make the
+files easily read or edited by human or machine. The format is completely
+machine/platform/operating system independent, so networks can be transferred
+between machines, sent by email, etc.  The basic grammar of the format is
+simple, and almost all features are optional, so very simple networks can be
+represented very simply, and are easy to parse and print.  The format has a
+very general structure which is designed to facilitate future extensions,
+in such a way as to provide backward compatibility (so that later version file
+readers can read earlier version files), and also to provide as much forward
+compatibility as possible (so earlier version file readers can read the
+appropriate parts of more complex later version files).
+
+This document may appear long, and the format may appear complicated, at first
+glance.  However, the basic structure of the format is simple, and you only
+need to use (and read about) that part of the format you need.
+A collection of "classic" belief networks, influence diagrams, decision
+networks, and control problems in the DNET format is available.
+
+There are plans for future versions of DNET to include:
+  1. Other forms of specifying sets of indexed nodes.
+  2. The ability for one node to represent a subnetwork.
+  3. Alternate ways of expressing special probabilistic relationships
+  4. Representing "decision trees"
+
+===============================================================================
+
+
+TUTORIAL BY EXAMPLES
+--------------------
+
+For a first example, we will generate a file for the famous "Cancer"
+example, a tiny network which first appeared in Cooper84, and later in
+Spiegelhalter86, Pearl88, and Neapolitan90.
+
+In the file, each object to be represented starts with a word indentifying
+the type of object, then its name, an open curly brace, 
+a series of semicolon-terminated statements providing values for
+its fields (attributes) and declarations of objects which are it's subparts, 
+a closing curly brace, and a semicolon.
+The field values may be objects (or names of objects) themselves.
+
+To represent a belief network (Bayesian network) we use the object
+type indentifier "bnet" followed by the name of the network,
+and then within the curly braces (i.e. its "body"), we put the
+objects that make up the network, for example its nodes.
+
+Here is how the network could look; it is explained in more 
+detail below (whitespace is unrestricted, so the spacing or 
+indenting could be changed if desired):
+
+bnet Cancer {
+    node Cancer {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = ();
+        probs = (0.2, 0.8);
+        };
+    node Calcium {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Increased, Not_Increased);
+        parents = (Cancer);
+        probs = ((0.8, 0.2), (0.2, 0.8));
+        };
+    node Tumor {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = (Cancer);
+        probs =  ((0.2, 0.8), (0.05, 0.95));
+        };
+    node Coma {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = (Tumor, Calcium);
+        probs = (((0.8, 0.2), (0.8, 0.2)), ((0.8, 0.2), (0.05, 0.95)));
+        };
+    node Headaches {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = (Tumor);
+        probs =  ((0.8, 0.2), (0.6, 0.4));
+        };
+    };
+
+Although much more could be added, the above is a complete specification of a 
+belief net, and any system reading DNET files should be able to read
+it as a complete belief net.  Simple programs working with belief nets
+need only to be able to print and parse these fields (and for greater
+simplicity, could replace the "states = ..." statements with "numstates = 2"
+statements).
+
+The "kind" of each node in this example is NATURE, which is equivalent 
+to the "chance" or "deterministic" designation of an influence diagram.
+"states" is a mutually exclusive and exhaustive list of the
+possible values of the node (or the random variable it represents).
+
+The "probs" field provides conditional probabilities for the states
+of a node given the states of its parents.  The order of the
+probability lists is a counting order, with the last parent changing
+fastest (with each parent running sequentially through its states).
+Anything after a double slash // to the end of that line, is ignored 
+by the file reader, so 
+for human viewing it helps to add a comment describing what each number
+is for, like this probs for the "Coma" node:
+
+        probs = 
+            // Present Absent     // Tumor    Calcium             
+            (((0.8,    0.2),      // Present  Increased     
+              (0.8,    0.2)),     // Present  Not_Increased 
+             ((0.8,    0.2),      // Absent   Increased     
+              (0.05,   0.95)));   // Absent   Not_Increased
+
+There are restrictions on the names of objects (limited length,
+only contains alphanumerics and underscore, etc., see the NAMES section).
+It is useful to have an unrestricted labeling for nodes, and that is
+provided by the "title" field, which is a quoted string
+(see the SYNTAX OF <STRING> section).  It is the name which is used to refer
+to the object from other places in the file, but the title is most often
+displayed to the end-user.
+
+We may want to attach a "comment" to a node, or net, which is a quoted
+text string containing information of use to a human user.
+This should not be confused with the "file comments" discussed with
+reference to the probs statement above.
+The former is read by the file reader, and attached to the node for display
+to the user and subsequent resaving of the file, while the latter is
+simply discarded by the file reader.
+For example, this statement may appear as a statement for the bnet:
+
+    comment = "Originally from Cooper84 (PhD thesis), but it has appeared in \
+        Spiegelhalter86, Pearl88 (book, p.196), & Neapolitan90 (book, p.179).";
+
+
+
+    Inheritance
+    -----------
+
+In the Cancer net above, you may have noticed that
+"kind = NATURE;" and "discrete = TRUE;" is repeated for every node,
+and "states = (Present, Absent);" is repeated for all the nodes except one. 
+Using inheritance we can decrease file size, and increase clarity and
+maintainability, by defining classes of nodes with certain field values. 
+In a large network, this sharing can be very significant. 
+
+We define a class of objects the same way that a member of the class would be
+declared, but it is preceeded with the word "define".  For example, we could 
+define a node class called "has" as follows:
+
+    define node has {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        }
+
+Then each node of network could inherit the field values from 'has' if
+'has' is placed in a parenthesized list between the node's name
+and its body in its declaration.  For example, the Cancer network becomes:
+
+bnet Cancer {
+    define node has {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        }
+    node Cancer (has) {
+        parents = ();
+        probs = (.2, .8);
+        };
+    node Calcium (has) {
+        states = (Increased, Not_Increased);
+        parents = (Cancer);
+        probs = ((.8, .2), (.2, .8));
+        };
+    node Tumor (has) {
+        parents = (Cancer);
+        probs =  ((.2, .8), (.05, .95));
+        };
+    node Coma (has) {
+        parents = (Tumor, Calcium);
+        probs = (((.8, .2), (.8, .2)), ((.8, .2), (.05, .95)));
+        };
+    node Headaches (has) {
+        parents = (Tumor);
+        probs =  ((.8, .2), (.6, .4));
+        };
+    };
+
+Notice that the "states" statement in node "Calcium" overrides the
+default provided by its inheritance. 
+
+Inheritance (and overriding defaults) may be used in class definitions
+as well, and is done in the same way. 
+To provide an example, we consider a network used to model a situation
+of "virtual" evidence (Pearl88), in which a number of imperfect observations
+of the variable A are to be made. 
+Each observation is represented by a Bxx node, where xx are digits.
+The observations are made in the same manner, so the conditional probabilities
+of Bxx given A are the same for each Bxx.
+
+bnet VirtualEvidence {
+    define node tf {                  // "define" just defines a class of nodes
+        kind = NATURE;
+        discrete = TRUE;
+        states = (True, False);
+        };
+    define node observeA (tf) {       // Class "observeA" inherits from "tf"
+        parents = (A);
+        probs = ((0.7), (0.2));
+        };
+    node A (tf) {                     // This is the node being observed
+        parents = ();
+        };
+    node B00 (observeA) {};           // Four observations
+    node B01 (observeA) {};
+    node B02 (observeA) {};
+    node B03 (observeA) {};
+    };
+
+For a more rigourous explanation of inheritance, including how
+multiple inheritance works, see the main "INHERITANCE" section.
+
+===============================================================================
+
+
+NODE TYPES
+----------
+
+Each node corresponds to a scalar quantity.  Sometimes we speak of the
+"underlying variable" of a node, which is a variable (possibly a random
+variable) that the node represents.  To represent nonscalar quantities 
+(e.g. vectors) use sets of nodes, indexed nodes, or "positioned" nodes.
+
+There are 4 aspects used to specify the type of a node:
+  measure  - Indicates the measurement type of the underlying variable it 
+               represents
+  discrete - Whether the variable is discrete or continuous
+  kind     - Indicates our intention or relation to the variable
+  chance   - Indicates whether the variable is deterministically specified 
+               by its parents
+
+Possible values for 'measure':   (a and b are two values of the variable)
+  NOMINAL  - Categorical variable (a=b is meaningful)
+  LOCAL    - distance(a,b), a=b are meaningful
+  ORDINAL  - a<b, a=b are meaningful
+  INTERVAL - a-b, a<b, a=b are meaningful
+  RATIO    - a/b, a=0, a-b, a<b, a=b are meaningful
+
+Possible values for 'discrete':
+  TRUE   - Discrete, digital
+  FALSE  - Continuous, analog
+
+Possible values for 'kind':
+  NATURE   - "Chance" or "Deterministic" node of influence diagram
+  DECISION - "Decision" node of influence diagram
+  UTILITY  - "Value" node of influence diagram
+  ASSUME   - A parameter that we can set for "what-if" conditional analysis
+
+Possible values for 'chance':
+  CHANCE   - Value of a node is given as a probabilistic function of
+                its parents
+  DETERMIN - Value of a node is given as a determinisitc function of
+                its parents
+
+Constraints:
+  CONTINUOUS nodes are never NOMINAL or LOCAL
+  UTILITY nodes are always CONTINUOUS, DETERMIN, and either INTERVAL or RATIO
+  DECISION nodes are DETERMIN for now, but this can be relaxed
+
+Examples:
+  Nominal discrete  - people, car models, yes/no answers, gender
+  Local discrete    - countries, colors (by name)
+  Ordinal discrete  - rating out of ten, push-button speed selector on a fan
+  Interval discrete - year of income tax return, C language memory pointers
+  Ratio discrete    - number of dimes in purse, number of cars at a stoplight
+
+  Nominal continuous  - not allowed
+  Local continuous    - not allowed
+  Ordinal continuous  - battery-level indicator, happiness, skin moisture meter
+  Interval continuous - absolute time, Celsius temperature, color wavelength
+  Ratio continuous    - mass, brightness, distance, speed
+
+===============================================================================
+
+
+"DISCONNECTED" NODES
+--------------------
+
+It is often useful to be able to represent a node, and the relationship it has
+with its parents, without actually specifying which nodes are its true
+parents.  For instance, during network editing it is convenient to be able to
+disconnect a node from its parents, and later reconnect it, or connect it to
+different parents, with no loss of information.  We also want to be able to
+save the network to a file in its "in-between" state, with some of its nodes
+disconnected.
+
+Sometimes nodes represent probabilistic relations, or deterministic functions,
+that are useful in a number of situations.  To move them from one situation to
+another, or to create a library of them, also requires a representation of a
+"disconnected" node.
+
+For that we use placeholders for parents called "parameters".  A "parameter"
+contains information that is required to interpret the relationship between a
+node and that parent, and to indicate constraints on what kind of parent is
+legal for that node (e.g. dimensional units, domain of values).
+
+A "parameter" object is declared using the keyword "param".  The fields of a
+"parameter" are a subset of the fields for a node, and their values should be
+the same as the parent they are meant to replace.  The following are the
+possible fields of a "parameter":
+
+    discrete, measure, numstates, states, levels, units
+
+The same "parameter" object may be shared by several nodes (i.e. several
+different nodes may refer to the same "parameter" as a parent).
+
+    Example
+    -------
+
+    param Gizmo {
+        discrete = TRUE;
+        states = (On, Off);
+        };
+
+    param Distance {
+        discrete = FALSE;
+        measure = RATIO;
+        units = km;
+        };
+
+    node Leakage {
+        kind = NATURE;
+        discrete = FALSE;
+        parents = (Gizmo, Distance);
+        equation = "Leakage (Gizmo, Distance) =   \
+                    (Gizmo == On) ? LRate * Distance : 0";
+        };
+
+    node Lose {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Lost, Have);
+        parents = (Distance, Distance);
+        inputs = (X, AveX);
+        equation = "p (Lose | X, AveX) =                              \
+            (Lose == Lost) ? CumExponentialDist (X, 1 / AveX) :       \
+                             1 - CumExponentialDist (X, 1 / AveX)";
+        comment = "If the average distance travelled when we lose it  \
+            is AveX, this node represents whether we've lost it after \
+            travelling X distance.";
+        };
+
+===============================================================================
+
+
+VISUAL NET
+----------
+
+The visual net (i.e. "visual" object) contains all the information on how to
+display, graphically edit, and print a diagram of a network.  It may contain
+information on fonts and colors used to display nodes and links, the size,
+placement, and scrolling position of the window, the courseness of the editing
+grid, etc.  It may own node objects, each of which may contain information on
+node size, placement, display format, the paths of the links between nodes,
+etc.  It contains no information that would be considered part of the
+semantics of the bnet (i.e. belief net, Bayesian net, influence diagram,
+decision net, etc.).  So it is not required for any bnet inference, learning,
+analysis, etc.
+
+Visual nets are objects of bnets, so each bnet may have a number of visual
+nets.  This may be useful to display the same bnet in different ways in
+different windows.  For example they might be at different scales, scrolled to
+different places, or with different node arrangements.  One might have some
+nodes hidden, or displayed with belief bars, graphs, or meters (e.g. one could
+be for the developer, and the other for an end-user).
+
+In some applications, the bnet might not need to be displayed or edited.  Then
+it does not need to have any visual net at all, and so file space and memory
+space can be saved by leaving it out.  This may simplify things for some
+systems, since they will not need to print or parse visual net information. 
+If they get a file from another system which has included visual information,
+they can easily ignore it by skipping ahead at every "visual" declaration (for
+example, by jumping to its ending semicolon - all semicolons in between can be
+ignored because the are within nested braces).
+
+
+   Coordinate System
+   -----------------
+
+The visual net uses an (x, y) coordinate system to specify positions and
+sizes.  The origin is at the upper left corner of the screen, or printed
+diagram, with positive x to the right, and positive y downward (so all
+coordinates are always positive).
+
+The x and y values are in "pixels", which often correspond to screen pixels,
+but dont have to.  There is a field called 'resolution' which provides a
+mapping from pixels to physical distances on a printed diagram (or on a
+computer screen).  On the screen (but not on printed diagrams) sizes also get
+multiplied by a field called 'magnification' (if it is provided).  This is for
+the purposes of "zooming in" (magnification > 1) or "zooming out"
+(magnification < 1).
+
+===============================================================================
+
+
+FILE IDENTIFIER
+---------------
+
+Somewhere within the first 3 lines of the file the following must appear:
+
+       // ~->[DNET-1]->~
+
+where DNET is the name of the file format, and 1 is its version number.  There
+may be other chars before and after these.
+
+Notice that it is "commented out" with the //.  That way readers that are not
+looking for it will not be bothered by it.
+
+Currently, between the square brackets there always appears only the file
+format name, followed by a dash, followed by an integer representing the
+version number.  Version numbers start at one and monontonically increase
+through time.  Later this standard may be expanded to include more complex
+expressions within the square brackets, such as:  ~->[DNET-5,VNET-3]->~
+
+The same format of indentifier could be put in other kinds of files, in each
+case "commented out" in a way suitable to that kind of file.  For instance,
+somewhere in the first three lines of a Mathematica file we could have:
+
+    (* ~->[MATHA-2]->~ *)
+
+===============================================================================
+
+
+LEVELS LIST
+-----------
+
+The levels list is a list of real numbers used to translate from continuous to
+discrete and vice-versa.  If the underlying variable is continuous, we may
+want to discretize it for certain analysis.  Conversely, if it is discrete, we
+may want a mapping from its state number (an integer) or name, to a measurable
+value.  For example, in a bang-bang control system, state 0 ("Off") may map to
+0 Volts, and state 1 ("On") may map to 6.2 Volts.
+
+For CONTINUOUS nodes:
+  - Levels list is one longer than the number of states.
+  - Levels list monotonicaly ascends or descends.
+  - The first and last entries of the levels list provide a bound on the
+      lowest and highest values the node can take on, but they may be
+      INFINITY or -INFINITY.
+  - To translate a continuous VAL to a discrete STATE choose STATE so that:
+      levels [STATE]   <=  VAL   <   levels [STATE + 1]   or
+      levels [STATE]   >   VAL   >=  levels [STATE + 1]
+  - To translate a discrete STATE to a continuous VAL, VAL is the range
+    [levels[STATE], levels[STATE + 1]).
+    If a point value is required, the midpoint may be used, or some other more 
+    complex interpolation scheme may be used.
+
+For DISCRETE nodes:
+  - There is one entry in the levels list for each state.
+  - There is no constraint on the ordering of levels entries if the node is 
+      NOMINAL or LOCAL, otherwise they must monotonicaly ascend or descend.
+  - To translate a discrete STATE to a "continuous" number VAL, use
+      VAL = levels[STATE].
+  - To translate a continuous VAL to a discrete STATE, choose STATE so that:
+      VAL = levels[STATE].  If there is no such STATE, then a legal translation
+      cannot be made, but you may want to approximate by choosing STATE so that
+      | VAL - levels[STATE] |   is minimized, or you may want to translate to a
+      probability distribution over states.
+
+===============================================================================
+
+
+BNF GRAMMAR
+-----------
+
+Below is a grammar for DNET files in Backus-Naur form, where angle brackets <>
+indicate a nonterminal, square brackets [] indicate an optional item, a
+vertical bar | indicates an alternative, a star * indicates 0 or more of the 
+preceeding, and a plus + indicates 1 or more of the preceeding.
+
+
+     1.     <file>  ->  [ <object> ; ]*
+
+     2.   <object>  ->  <objtype> <idname> { <stmt>* }
+
+     3.     <stmt>  ->  <field> = <value> ;
+
+     4.     <stmt>  ->  <object> ;
+
+     5.    <value>  ->  <idname>  |  <number>  |  <string> | <object> | <list>
+
+     6.     <list>  ->  ( [<value>] [, <value>]* )
+
+     7.    <field>  ->  <idname>
+
+     8.  <objtype>  ->  <idname>
+
+     9.   <idname>  ->  <alpha> <idchar>*
+
+    10.   <idchar>  ->  <alpha>  |  <digit>  |  _
+
+    11.   <string>  ->  " <genchar>* "
+
+    12.  <genchar>  ->  <char>  |  \ <char>  |  \\  |  \"  |  \ <hex> <hex>
+
+    13.     <char>  ->  <alpha>  |  <digit>  |  <punc>
+
+    14.   <number>  ->  [+ | -] [0x] <digit>* [.] <digit>+ [e <digit>+]
+
+    15.      <hex>  ->  <digit> | A | B | C | D | E | F
+
+    16.    <alpha>  ->  a | b | c | ... | z | A | B | C | ... | Z
+
+    17.    <digit>  ->  0 | 1 | 2 | ... | 9
+
+    18.     <punc> -> !|@|#|$|%|^|&|*|(|)|-|=|+|[|]|{|}|;|:|'|||,|.|<|>|?|/|`|~
+
+
+If inheritance is enabled the following productions are added (or replaced):
+
+     4.     <stmt>  ->  [define] <object> ;
+
+     2.   <object>  ->  <objtype> <idname> [<list>]  { <stmt>* }
+
+
+And if subfields are used the following production is added:  (currently arent)
+
+    40.     <idname>  ->  <idname> . <idname>
+
+
+There must be whitespace between <objtype> and <idname> in production 2, and
+there may be any amount of whitespace anywhere else, except within <idname>,
+<number>, or <string>.  There is a special way to insert some ignorable
+whitespace in <string>, see the "STRING SYNTAX" section.
+
+For bnet files in particular, we may rewrite some of the productions to more
+clearly show their internal structure:
+
+    1a.     <file>  ->  [ <bnet> ; ]*
+
+    2a.     <bnet>  ->  bnet <idname> { <netstmt>* }
+
+    3a.  <netstmt>  ->  <netfield> = <value> ;
+
+    4a.  <netstmt>  ->  <bnode> ;
+
+    4b.  <netstmt>  ->  <param> ;
+
+    4c.  <netstmt>  ->  <visnet> ;
+
+    2b.    <bnode>  ->  node <idname> { <nodestmt>* }
+
+    3b. <nodestmt>  ->  <nodefield> = <value> ;
+
+    4d. <nodestmt>  ->  <visnode> ;
+
+    2c.    <param>  ->  param <idname> { <paramstmt>* }
+
+    3c.<paramstmt>  ->  <paramfield> = <value> ;
+
+    2d.   <visnet>  ->  visual <idname> { <vnetstmt>* }
+
+    3d. <vnetstmt>  ->  <vnetfield> = <value> ;
+
+    2e.  <visnode>  ->  visual <idname> { <vnodestmt>* }
+
+    3e. <vnodestmt> ->  <vnodefield> = <value> ;
+
+    4e. <vnodestmt> ->  <vislink> ;
+
+    2f. <vislink>   ->  link <idname> { <vlinkstmt>* }
+
+    3f. <vlinkstmt> ->  <vlinkfield> = <value> ;
+
+    7a. <netfield>  ->  numdimensions | eqncontext | user |
+                        title | comment | author | whochanged | whenchanged |
+                        locked
+
+    7b. <nodefield> ->  kind | discrete | measure | chance | numstates | states |
+                        levels | units | inputs | parents | functable |
+                        equation | probs | numcases | fading | delays | 
+                        persist | position | evidcost | user | title | 
+                        comment | author | whochanged | whenchanged | locked | 
+                        value | evidence | belief
+
+    7c. <paramfield> -> discrete | measure | numstates | states | levels | units
+
+    7d. <vnetfield> ->  dispname | dispform | defdispform | nodelabeling | 
+                        nodefont | linkfont | commentfont | linkjoin | 
+                        showstrength | nodecolors | linkcolors | 
+                        backcolor | commentcolor | pagebreakcolor | 
+                        groupingcolor | commentinfos | parts | windowposn | 
+                        scrollposn | resolution | magnification | 
+                        drawingbounds | showpagebreaks | usegrid | gridspace | 
+                        user
+
+    7e. <vnodefield> -> center | size | dispform | hidden | height | links | 
+                        user | parts
+
+    7f. <vlinkfield> -> path | labelposn | linewidth | hidden | shareseg | user
+
+
+With inheritance enabled, we add (or change):
+
+    4a.  <netstmt>  ->  [define]  <bnode> ;
+
+    2b.    <bnode>  ->  bnode <idname> [<list>]  { <nodestmt>* }
+
+====================================================================================
+
+
+NAMES
+-----
+
+Names are used within the file to identify objects; titles are not used for this
+purpose.  The name always directly follows the object type at the beginning
+of the object declaration.
+
+Names are called <idname> in the BNF GRAMMAR section.
+
+Restrictions on names:
+
+  - Composed only of alphanumerics and underscores (A-Z,a-z,0-9,_).
+  - Must begin with an alphabetic character (A-Z,a-z).
+  - Has maximum of 31 characters.
+  - Must be unique name within its scope (within the curly braces it appears within)
+  - Names are case sensitive (so "DNA" and "dna" are different names).
+
+
+====================================================================================
+
+
+INHERITANCE
+-----------
+
+Often many nodes have similarities to each other, and if each is described 
+completely, there is much redundancy in the file, resulting in a long file
+which takes a long time to read and write.
+
+By allowing nodes to inherit features from defined nodes, the redundancy is
+reduced.  Also, the file may become clearer for humans wishing to edit it
+directly.  Such inheritance is an optional feature of the DNET format,
+so if you want to keep things simple, you can leave it out.
+
+If several nodes share some features (e.g., have the same values for some
+fields), then we can define a node class which has those features, by making a
+regular node declaration, but preceeding it with the word define.  Then each
+of the nodes which has those features can inherit from that node class by
+placing the class name in a list directly after each nodes' name in its
+declaration.  The definition of the node class by itself does not create any
+node.
+
+For instance, we may be building a large Bayesian network with many nodes
+which represent propositions.  We can define the "tf" class of node, and use
+it as follows:
+
+    define node tf {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (True, False);
+        parents = ();
+        };
+
+    node Fire (tf) {probs = (.01, .09);};
+
+    node Smoke (tf) {parents = (Fire);   probs = ((.9, .1), (.01, .99));};
+
+Then node Fire and node Smoke both inherit all the field values of tf, except
+node Smoke overrides the parents field with its own parents statement.
+
+When a node class is being defined, it in turn may inherit from another node
+class, and so on.  If node class B inherits from node class A, then the
+declaration for A must appear before that of B in the file.  This prevents
+problems with recursive definitions.
+
+If we want a node B to inherit from a number of classes, we put them all in
+the list after B's name.  The nodes that appear earlier in this list have
+higher precedence.  This is a multiple-inheritance situation, which may
+involve defaults and exceptions.  There are two alternate, but equivalent,
+ways of determining what the field values of a node B are if it inherits from
+node classes C1, C2, ... Cn.
+
+The first way:
+First, we determine what the field values for each node class Ci are by using
+this method recursively.  Then we combine the field values of node classes C1
+to Cn, by taking their union, and whenever more than 1 node provides a value
+for the same field, we take as its value that provided by the first node in
+the list.  Finally we consider the body of the declaration for node B, forming
+the union of field values defined directly for node B with the previous union,
+and when they both provide a value for the same field, taking the one provided
+in the body of B.  The resulting union provides the field values for node B.
+
+The second way:
+Inheritance for field F of node B, is done by "looking down the inheritance
+path" of B for the first node class (or node) H which defines field F.  Then
+the inherited value for B is the value of F defined in node H.  The
+inheritance path of node B is a list, starting with B, then including the
+entire inheritance path of C1, then the entire inheritance path of C2, and so
+on, until it includes the entire inheritance path of Cn.  The nodes that B
+directly inherits from must preceed B in the file, which implies that B's
+entire inheritance path will preceed it in the file.
+
+If some field does not appear in the declaration of B, and is not inherited,
+and is not a "required" field (see the "REQUIRED FIELDS" section), then its
+value is assumed to be the default value for that field.  If it is a required
+field, an error is generated.
+
+Objects are inherited in a similar way as fields.  A node inherits all the
+objects owned by all the nodes on its inheritance path, except in cases where
+there are more than one object with the same type and name, in which case only
+the first one along the inheritance path is inherited.  Object inheritance may
+be blocked by declaring a null object.  For example, if we have:
+
+    define node C {
+        ....
+        visual v1 {....};
+        }
+
+    node B (C) {
+        ....
+        }
+
+then node B will inherit the visual object from node class C.  This can be
+prevented by adding a  visual v1 {};  statement to node B.
+
+Currently the only objects that can inherit are the nodes of bnets, but that
+will be changing.
+
+Currently nodes can also inherit from other nodes (not just node classes, 
+declared with a "define"), but the plan is to phase this out.  Any comments?
+
+===============================================================================
+
+
+LIST OF FIELDS
+--------------
+
+
+   BNET Fields
+   -----------
+
+NUMDIMENSIONS       
+EQNCONTEXT       
+USER              
+TITLE           Unrestricted string which titles the net
+COMMENT         Unrestricted string to document the net
+AUTHOR          Identfying name of the agent with responsability for the net
+WHOCHANGED      Identfying name of the agent who last changed the net
+WHENCHANGED     When the net was last changed
+LOCKED          Whether agents other than the author can change the net
+
+
+   BNODE Fields
+   ------------
+
+KIND            Whether its a nature, decision, utility or assume node
+DISCRETE        Whether the underlying variable is discrete or continuous
+MEASURE         Whether it is NOMINAL, LOCAL, ORDINAL, INTERVAL, or RATIO
+CHANCE          Whether a deterministic function of parents or not
+NUMSTATES       How many states the variable has, or is being discretized into
+STATES          List of the names of the node's states
+LEVELS          To translate between continuous and discrete
+UNITS           
+INPUTS          To name the links entering a node
+PARENTS         A list of nodes this node depends on
+FUNCTABLE       A table providing the function of a deterministic node
+PROBS           A table of the conditional probabilities of a chance node
+NUMCASES        For confidence / learning of the PROBS table
+EQUATION        For the relation between a node and its parents
+FADING
+DELAYS          List of one delay for each link
+PERSIST         How long before the value of a node usually changes
+POSITION        The time, space, etc. point of the node's variable
+VALUE           The observed, or known, value of a continuous node
+EVIDENCE        The observed, or known, value of a discrete node
+USER              
+TITLE           Unrestricted string which titles the node
+COMMENT         Unrestricted string to document the node
+AUTHOR          Identfying name of the agent with responsability for the node
+WHOCHANGED      Identfying name of the agent who last changed the node
+WHENCHANGED     When the node was last changed
+LOCKED          Whether agents other than the author can change the node
+
+
+   VNET Fields
+   -----------
+
+DISPFORM        How to display the nodes (overrides the node's DISPFORM)
+DEFDISPFORM     How to display the nodes (overridden by the node's DISPFORM)
+NODELABELING    Whether display nodes with name, title or both
+HIDDEN          Whether to display the links between nodes
+NODEFONT        The font to use when displaying a node's name or title
+LINKFONT        The font to use when displaying a link's name or title
+COMMENTFONT     The font to use when displaying a documentation comment
+LINKJOIN
+SHOWSTRENGTH
+BACKCOLOR
+PAGEBREAKCOLOR
+GROUPINGCOLOR
+WINDOWPOSN      Initial position & size of the net's window on the screen
+SCROLLPOSN      Initial scrolling position of the net's window
+RESOLUTION      Converts between dimensions in this file and physical sizes
+MAGNIFICATION   Whether the network is temporarily zoomed-in or zoomed-out
+DRAWINGBOUNDS   The overall size of the document containing the network
+SHOWPAGEBREAKS  Display lines where page divisions will occur when printing
+USEGRID         Whether movements should be constrained to a grid while editing
+GRIDSPACE       The courseness of the move constraint grid during editing
+USER
+
+
+   VNODE Fields
+   ------------
+
+CENTER         The location of the center of the node
+SIZE           The width and height of the node
+DISPFORM       The form in which to display a node (e.g. LABELBOX, BELIEFBARS)
+HEIGHT         If two nodes overlap, the one with greater height appears on top
+HIDDEN         Whether to display the node or not
+USER
+
+
+   VLINK Fields
+   ------------
+
+PATH            List of coordinate pairs of the bends along the link path
+LABELPOSN       A rectangle giving the position of the link name
+LINEWIDTH       The width of line to draw the link
+USER
+
+
+
+===============================================================================
+
+
+FIELD DESCRIPTIONS
+------------------
+
+
+BNET FIELDS
+-----------
+
+
+AUTHOR  =  <string>
+
+    This is an identfying name of the person, or agent, with ultimate
+    responsability for this net.  It can be an unrestricted string (it does not
+    have to be an idname), but the recommended form for a human name is the
+    last name (i.e., surname) followed by upper case initials, with no spaces
+    between.  If there is no WHOCHANGED field, then it is assumed that the
+    author was the last agent to change the net.  Note that individual nodes
+    can have separate authors as well.
+    See also the LOCKED field.
+    Examples:
+        author = "ZhangLW";
+
+
+COMMENT  =  <string>
+
+    This is an unrestricted string of characters which can be used to store
+    information about the origin of the net, its purpose or applicability,
+    copyright notice, etc.  Information pertaining only to a particular node
+    should not be placed here, but rather in that node's comment field.
+    Examples:
+        comment = "From Matheson, James E. (1990) \"Using influence diagrams \
+            to value information and control\", in Influence Diagrams, Belief \
+            Nets and Decision Analysis, R. M. Oliver and J. Q. Smith (eds.).\n\
+            Used as an example of value-of-information calculations.";
+        comment = "Represents the working relationships between parts of a \
+            1983 manual Honda Accord.\n\
+            All probabilities are supposed to be over all cars brought \
+            into a Honda dealership for repair.\n\
+            Copyright 1992-1994 Brent Boerlage";
+
+
+EQNCONTEXT  =  <string>
+
+
+LOCKED  =  <boolean>
+
+    If locked is set to TRUE, then only the primary author (see the AUTHOR
+    field) may edit the network with the visual editor.
+    The default value is FALSE.
+    Example:
+        locked = TRUE;
+
+
+NUMDIMENSIONS  =  <integer>
+
+
+TITLE  =  <string>
+
+    This is an unrestricted string of characters to use for titling the net.
+    The name of a net must be a legal idname (limited length, contains only
+    alphanumerics and underscores, etc.), but the TITLE has no such 
+    restrictions (any characters, unlimited length).
+    It is advised not to put too much information in the title, since the
+    COMMENT field is available for that.
+    Example:
+        title = "Car Buyer";
+
+
+USER  =  ?
+
+    This field is provided for the convenience of external developers.
+    By providing the appropriate reading and printing routines, this field may
+    contain whatever is desired, possibly a large object with many fields.
+    Its syntax should conform to the "BNF GRAMMAR" section so that it may be
+    easily skipped by software that doesn't know how to read it.
+    See the "USER FIELDS" section.
+
+
+WHENCHANGED  =  <integer>
+
+    This is the time of the last change to this net, given as the number
+    of seconds past 00:00 Coordinated Universal Time (UTC) on January 1, 1970
+    (the POSIX standard).  It may be later than the WHENCHANGED of any of the
+    nodes in this net, since the last change may not have influenced an
+    existing node, but it should not be earlier.
+    Example:
+        whenchanged = 767569345;
+        whochanged = (767769345, 767760321);    // not allowed now, but future
+                                                // versions may allow this.
+
+
+WHOCHANGED  =  <string>
+
+    This is an identfying name of the last person, or agent, to have changed 
+    this net.  It can be an unrestricted string (it does not have to be
+    an idname), but the recommended form for a human name is the last name 
+    (i.e., surname) followed by upper case initials, with no spaces between. 
+    Note that individual nodes can have separate WHOCHANGED fields as well.
+    See also the AUTHOR field.
+    Examples:
+        whochanged = "BoerlageB";
+        whochanged = ("PooleD", "BoerlageB");    // not allowed now, but future
+                                                 // versions may allow this.
+
+
+BNODE FIELDS  (BNET.NODE)
+------------
+
+
+AUTHOR  =  <string>
+
+    This is an identfying name of the person, or agent, with ultimate
+    responsability for this node.  It can be an unrestricted string (it does 
+    not have to be an idname), but the recommended form for a human name is the
+    last name (i.e., surname) followed by upper case initials, with no spaces
+    between.  If there is no WHOCHANGED field, then it is assumed that the
+    author was the last agent to change the node.  Note that the overall net
+    can also have an author.
+    See also the LOCKED field.
+    Examples:
+        author = "HorschM";
+
+
+CHANCE  =  one of  CHANCE, DETERMIN
+
+    This field indicates whether a node is given as a probabilistic or
+    deterministic function of its parents.
+    Its value must be one of: 
+        CHANCE   - Value of a node is given as a probabilistic function of its
+                     parents
+        DETERMIN - Value of a node is given as a determinisitc function of its
+                     parents
+    See also the KIND, DISCRETE, and MEASURE fields, and the "NODE TYPES" 
+    sections elsewhere in this document.
+    Example:
+        chance = DETERMIN;
+
+
+COMMENT  =  <string>
+
+    This is an unrestricted string of characters which can be used to store
+    information about the meaning of the node, the meanings of its states, how
+    it is to be measured, the origin of its probabilities, etc.  Information
+    pertaining to the whole net should not be placed here, but rather in the
+    net's comment field.
+    Examples:
+        comment = "Displacement of cart.\n\
+            Positive displacement is to the right.\n\";
+
+
+DELAYS  =  list of list of <number>   or   list of list of <string>
+
+    &&.  If DELAYS is not provided, it is assumed (for each parent and
+    each dimension) to be 0.
+
+
+DISCRETE  =  one of  TRUE, FALSE
+
+    This field indicates whether the underlying variable is discrete or
+    continuous.
+    Its value must be one of: 
+        TRUE  (DISCRETE?)   - Discrete, digital
+        FALSE (CONTINUOUS?) - Continuous, analog
+    It should be emphasized that this field only concerns the underlying
+    physical variable the node represents, not how it is to be treated.
+    Continuous variables may be discretized and discrete variables may provide
+    values in continuous settings.
+    See also the KIND, CHANCE, and MEASURE fields, and the "NODE TYPES" section 
+    elsewhere in this document.  This field must be provided (possibly by
+    inheritance) for every node.
+    Example:
+        discrete = TRUE;
+
+
+EQUATION  =  <string>
+
+    Provides a deterministic equation for the value of a node given the
+    values of its parents, or a probabilistic equation for the probability of
+    the node having a certain value, conditioned on the values of its parents.
+    The nodes and functions in the equation may be continuous or discrete.
+    Examples:
+        equation = "P (N | N1) = NormalDist (N, N1 + ddg * (20 - N1), ddg * 3)";
+
+        equation = "S (H1, H) =  (H == H1) ? 0 : 1";
+
+        equation = "xdd (a, ad, F) = \n\
+            F / mc + mp * lp * (ad^2 * sin(a) - ((mc * \
+            g * sin(a) - cos(a) * (F + mp * lp * ad^2 * sin(a))) / \n\
+            (4 * mc * lp / 3 - mp * lp * cos(a)^2)) * cos(a)) / mc";
+    
+
+EVIDENCE  =  <idname>  or  <integer>
+
+    This is the observed, or known, value of a discrete node, as applied to
+    some particular case.
+    In the case of a KIND = ASSUME node, it is the assumed value.
+    It can be set to the name of the observed state, or its state number
+    (numbers go from 0 to NUMSTATES - 1).
+    If the node is continuous, normally a VALUE statement is used instead,
+    but an EVIDENCE statement may be used provided there is a LEVELS
+    statement to discretize the node.
+    Examples:
+        evidence = Heavy;
+        evidence = 3;
+
+
+FADING  =  <number>  or <string>
+
+    
+
+FUNCTABLE  =  list of, list of, ... list of <number>
+
+    This provides a table giving the state, or value, of a deterministic
+    node as a function of the states of its parents.  It is a contingency
+    table of values, with one value for each possible setting of values for
+    the parents (i.e., one for each element of the parents' cartesian
+    product).  If the node is continuous, then the values will be real
+    numbers, while if the node is discrete the values will be state numbers
+    (integers) or state names.  A FUNCTABLE can only be used when all the
+    parents are discrete, or have levels lists to discretize them. 
+
+    The values are arranged in order.  The first one is for all the
+    parents being in their first state.  The second is for all the parents
+    being in their first state, except the last parent is in its second state. 
+    This continues until the last parent is in its last state, after which
+    the second last parent goes to its second state, and the last parent
+    returns to its first state.  The counting continues upwards, "odometer
+    style", with the last parent changing the fastest, to the final case
+    where all parents take on their last states. The number of values supplied
+    will be the product of the numbers of states of each of the parents. 
+
+    The values are all contained within lists.  All those for the same
+    settings of all the parents except the last are in the same list.  These
+    lists are also in higher lists.  All lists with the same settings for all
+    the parents except the last 2 are in the same higher list.  And so on,
+    until we have a single highest level list that contains all the others. By
+    examining just the list structure one can recover the n-dimensional array
+    of values making up the functable, where n is the number of parents. 
+    
+    For any of the values "@undef" can appear, which means that this value
+    has not yet been defined.  For example, if the table is being built up
+    slowly over a number of sessions, this is useful to indicate which parts
+    of the table have not yet been completed.
+    
+    Some combinations of parent values may be impossible.  In the FUNCTABLE,
+    @imposs may be used for these entries to explicitly state that the author
+    believed these to be impossible conditions, so that if they do arise an
+    appropriate error message may be given.
+    
+    Sometimes it is useful to provide a comment for each value to show
+    which parent settings it is for.  An example will clarify all of the
+    above.  Suppose we have a node which can take one of 4 states: S0, S1, S2,
+    S3.  It has 3 parents.  Parent A can take the states A1, A2, parent B can
+    take the states B1, B2, B3, and parent C can take the states C1, C2. 
+    The parents statement is:
+        parents = (A, B, C);
+    so parent C is the last parent, and its state values will change the
+    fastest.
+    The functable could look like:
+        functable =     // A   B   C
+            (((S3,      // A1  B1  C1
+               S1),     // A1  B1  C2
+              (S3,      // A1  B2  C1
+               S0),     // A1  B2  C2
+              (S3,      // A1  B3  C1
+               S1)),    // A1  B3  C2
+             ((@undef,  // A2  B1  C1
+               @undef), // A2  B1  C2
+              (S1,      // A2  B2  C1
+               S0),     // A2  B2  C2
+              (@undef,  // A2  B3  C1
+               S0)));   // A2  B3  C2
+
+    For probabilistic relationships, use a PROBS statement.
+    
+    Examples:
+
+        node Take_Umbrella {
+            kind = DECISION;
+            discrete = TRUE;
+            states = (Take_It, Leave_At_Home);
+            parents = (Forecast);
+            functable =         // Forecast 
+                (Leave_At_Home, // Sunny
+                 Leave_At_Home, // Cloudy
+                 Take_It);      // Rainy
+            }
+
+        node U {
+            kind = UTILITY;
+            discrete = FALSE;
+            parents = (Weather, Take_Umbrella);
+            functable =  // Weather  Take_Umbrella 
+                ((20,    // Sunshine Take_It
+                  100),  // Sunshine Leave_At_Home
+                 (70,    // Rain     Take_It
+                  0));   // Rain     Leave_At_Home
+            }
+
+
+INPUTS  =  list of <idname>
+
+    This is to provide a mapping from a node's parents to its equation. 
+    The list should have as many slots as there are parents (although some of
+    these can be empty - see example). 
+
+    Each name corresponds to one parent, in the same order the parents are
+    given.  Equations can then refer to these names instead of the parents,
+    giving a layer of insulation to the true parents, which makes it more
+    convenient when switching parents (eg, when duplicating a node that
+    represents a certain function).  It is not necessary to have an INPUTS
+    statement, since the parent names can be used in the equation, unless a
+    parent is repeated with a delay link, in which case input names are
+    required to disambiguate. 
+
+    Each name must be a legal idname (starts with a letter, consists only
+    of letters, digits and underscores, and is 31 or less characters long),
+    and there must be no duplications in the list.
+    If the INPUTS statement list contains some empty slots, parent names
+    will be used in their place.
+    Examples:
+        inputs = (x, , z, t);
+
+
+KIND  =  one of  NATURE, DECISION, UTILITY, ASSUME
+
+    This field indicates our intention or relation to the variable represented
+    by the node.
+    Its value must be one of: 
+        NATURE   - "Chance" or "Deterministic" node of an influence diagram
+        DECISION - "Decision" node of an influence diagram
+        UTILITY  - "Value" node of an influence diagram
+        ASSUME   - A parameter that we can set
+    See also the CHANCE, DISCRETE, and MEASURE fields, and the "NODE TYPES"
+    section elsewhere in this document.  This field must be provided (possibly
+    by inheritance) for every node.
+    Example:
+        kind = DECISION;
+
+
+LEVELS  =  list of <number>
+
+    The levels list is a list of real numbers used to translate from
+    continuous to discrete representations and vice-versa.  If the underlying
+    variable is continuous, we may want to discretize it for certain analysis.
+    Conversely, if it is discrete, we may want a mapping from its state
+    number (an integer) or name, to a measurable value.  For example, in a
+    bang-bang control system, state 0 ("Off") may map to 0 Volts, and state 1
+    ("On") may map to 6 Volts.
+
+    For CONTINUOUS nodes:
+      - Levels list is one longer than the number of states, but with a
+          minimum length of 2.
+      - Levels list monotonicaly ascends or descends.
+      - The first and last entries of the levels list provide a bound on the
+          lowest and highest values the node can take on, but they may be
+          INFINITY or -INFINITY.
+      - To translate a continuous VAL to a discrete STATE choose STATE so that:
+          levels [STATE]   <=  VAL   <   levels [STATE + 1]   or
+          levels [STATE]   >   VAL   >=  levels [STATE + 1]
+      - To translate a discrete STATE to a continuous VAL, VAL is the range
+        [levels[STATE], levels[STATE + 1]).
+        If a point value is required, the midpoint may be used, or some other
+        more complex interpolation scheme may be used.
+
+    For DISCRETE nodes:
+      - There is one entry in the levels list for each state.
+      - There is no constraint on the ordering of levels entries if the node is 
+          NOMINAL or LOCAL, otherwise they must monotonicaly ascend or descend.
+      - To translate a discrete STATE to a "continuous" number VAL, use
+          VAL = levels[STATE].
+      - To translate a continuous VAL to a discrete STATE, choose STATE so that
+          VAL = levels[STATE].  If there is no such STATE, then a legal
+          translation cannot be made, but you may want to approximate by
+          choosing STATE so that | VAL - levels[STATE] |  is minimized, or you
+          may want to translate to a probability distribution over states.
+
+    Examples:
+        levels = (-10, -5, 0, 5, 10);
+        levels = (0, 1.25, 2.75, 4.5, INFINITY);
+
+
+LOCKED  =  <boolean>
+
+    If locked is set to TRUE, then only the primary author (see the AUTHOR
+    field) of this node, or this net, may edit this node with the visual
+    editor. 
+    The default value is FALSE.
+    Example:
+        locked = TRUE;
+
+
+
+MEASURE  =  one of  NOMINAL, LOCAL, ORDINAL, INTERVAL, RATIO
+
+    This field indicates the measurement type of the underlying variable it
+    represents.
+    Its value must be one of:   (a and b are two values of the variable)
+        NOMINAL  - Categorical variable (a=b is meaningful)
+        LOCAL    - distance(a,b), a=b are meaningful
+        ORDINAL  - a<b, a=b are meaningful
+        INTERVAL - a-b, a<b, a=b are meaningful
+        RATIO    - a/b, a=0, a-b, a<b, a=b are meaningful
+    See also the KIND, DISCRETE, and CHANCE fields, and the "NODE TYPES" section 
+    elsewhere in this document.
+    Example:
+        measure = ORDINAL;
+
+
+NUMCASES  =  list of, list of, ... list of <number>
+
+    For use in conjunction with a PROBS statement to indicate the confidence
+    in the probabilities (e.g. during learning).
+    It has the same structure as the FUNCTABLE statement described above,
+    except each individual element is not a value for the node, but rather
+    an "estimated sample size" (ESS) for the corresponding probability vector
+    of the PROBS statement.
+
+
+NUMSTATES  =  <integer>
+
+    If this node represents a discrete variable, then NUMSTATES is the
+    number of states the variable can take on.  If it represents a continuous
+    variable, then NUMSTATES is the number of states it has been discretized
+    into (ie, how many "bins" its values have been partitioned into). 
+    Normally there is no NUMSTATES statement because the number of states can
+    be determined from a STATES or LEVELS statement.  If there is no STATES or
+    LEVELS statement, discrete nodes must have a NUMSTATES statement.
+    Example:
+        numstates = 100;
+
+
+PARENTS  =  list of <idname>
+
+    A list of the parents (predecessors) of this node in a Bayesian network,
+    influence diagram, or decision network.
+    It is okay for parents to repeat (this is especially useful when some of
+    the parent links have a delay associated with them).
+    Remember to use the names of the parent nodes, not their titles.
+    Examples:
+        parents = (Light, Temperature, Kindness);
+        parents = ();
+        parents = (Weather, Take_Umbrella);
+
+
+PERSIST  =  list of <number>   or   list of <string>
+
+    &&.  If PERSIST is not provided for a node, it is assumed (for each
+    dimension) to be the minimum of the persists of the node's parents (if it
+    doesn't have any parents, that's infinity).  If the node is its own parent
+    (through a delay link) the delay of that link is included in the minimum.
+    This "inheritance" propagates to descendents, blocked only by nodes with
+    an explicitly declared persist.
+
+
+POSITION  =  list of <number>   or   list of <string>
+
+    &&.  Do not confuse this with the vnode field CENTER, which determines
+    where on the diagram the node appears.
+
+
+PROBS  =  list of, list of, ... list of <number>
+
+    This is a contingency table of conditional probabilities for the
+    various states of a node given the states of its parents.  This set of
+    probabilities has been called a "link matrix" (Pearl88), or NPF (node
+    probability function).  It should only be given for a node that is
+    discrete, or that has a levels list to discretize it.  Also, all its
+    parents should be discrete, or have levels lists to discretize them. 
+    
+    It has the same structure as the FUNCTABLE statement described above,
+    except each individual element is not a value for the node, but rather a
+    list of numbers between 0 and 1 inclusive, with one number for each
+    state of the node, indicating the probability of that state.
+    The probability vectors are normalized, so the numbers within each
+    list add to 1. 
+
+    Probabilities may be @undef or @imposs as in the FUNCTABLE statement.
+
+    Old version of the DNET file format allowed leaving out the last
+    number of each probability vector, but that is no longer allowed.
+    (it is not numerically stable when the first number is close to 1).
+    
+    For deterministic relationships, use FUNCTABLE.
+    
+    Examples:
+        probs = ((0.2, 0.8), (0.1, 0.9));
+
+        probs =
+            // Forecast:
+            // Sunny       Cloudy       Rainy    // Actual Weather:
+            ((0.7,         0.2,         0.1),    // Sunshine
+             (0.15,        0.25,        0.6));   // Rain
+
+        probs =
+            // Forecast:
+            // Sunny       Cloudy       Rainy      // Actual Weather:
+            ((0.7,         @undef,      @undef),   // Sunshine
+             (0.15,        0.25,        0.6),      // Rain
+             (@imposs,     @imposs,     @imposs)); // Manna
+
+        probs =
+            // Battery voltage:
+            // strong    weak      dead      // Charging: Battery Age:
+            (((0.95,     0.04,     0.01),    // Okay      new
+              (0.8,      0.15,     0.05),    // Okay      old
+              (0.6,      0.3,      0.1)),    // Okay      very_old
+             ((0.008,    0.3,      0.692),   // Faulty    new
+              (0.004,    0.2,      0.796),   // Faulty    old
+              (0.002,    0.1,      0.898))); // Faulty    very_old
+
+
+STATES  =  list of <idname>
+
+    This is a list of the names of the possible states of this node.  Each
+    one must be a legal idname (starts with a letter, consists only of
+    letters, digits and underscores, and is 31 or less characters long). 
+    There must be no duplications in the list, although it is okay for this
+    node to have some state names which are the same as another node.
+    Examples:
+        states = (Low, Medium, High);
+        states = (True, False);
+
+
+TITLE  =  <string>
+
+    This is an unrestricted string of characters to use for titling the node. 
+    The NAME of a node must be a legal idname (limited length, limited
+    characters), but the TITLE has no such restrictions (any characters,
+    unlimited length).  It is advised not to put too much information in the
+    title, since the COMMENT field is available for that. 
+    Example:
+        title = "% increase of\n micromorts/hour";
+
+
+UNITS  =  <string>
+
+    This statement provides the physical measurement units for the variable of
+    the node.  The units field may later be used to do dimensional analysis,
+    conversions, and checking.
+    Examples:
+        units = "mi/hr";
+        units = "kg.m/s2";
+        units = "";                // indicates a dimensionless variable
+
+
+VALUE  =  <number>
+
+    This is the observed, or known, value of a continuous node, as applied to
+    some particular case.
+    In the node is a KIND = ASSUME node, this is the assumed value.
+    If the node is discrete, use an EVIDENCE statement instead.
+    Example:
+        value = 5.27;
+
+
+WHENCHANGED  =  <integer>
+
+    This is the time of the last change to this node, given as the number
+    of seconds past 00:00 Coordinated Universal Time (UTC) on January 1, 1970
+    (the POSIX standard).
+    Example:
+        whenchanged = 767592010;
+
+
+WHOCHANGED  =  <string>
+
+    This is an identfying name of the last person, or agent, to have
+    changed this node.  It can be an unrestricted string (it does not have to 
+    be an idname), but the recommended form for a human name is the last name
+    (i.e., surname) followed by upper case initials, with no spaces between. 
+    Note that the overall net can also have a WHOCHANGED field.
+    See also the AUTHOR field.
+    Examples:
+        whochanged = "XiangY";
+
+
+USER  =  ?
+
+    This field is provided for the convenience of external developers.
+    By providing the appropriate reading and printing routines, this field may
+    contain whatever is desired, possibly a large object with many fields.
+    Its syntax should conform to the "BNF GRAMMAR" section so that it may be
+    easily skipped by software that doesn't know how to read it.
+    See the "USER FIELDS" section.
+
+
+
+VNET FIELDS  (BNET.VISUAL)
+-----------
+
+
+COMMENTFONT  =  <font>
+
+    The font to normally use when displaying comments on the diagram.
+    Example:
+        commentfont = font {shape = Courier;  size = 10;};
+
+
+DEFDISPFORM  =  one of  ABSENT, CIRCLE, LABEL, LABELBOX, BELIEFBARS
+
+    This specifies the default way to display all the nodes on the
+    screen and on printed diagrams.  The meaning of each possibility is 
+    explained in the "VNODE FIELDS" section, under "DISPFORM".
+
+    Certain nodes may override this value by providing their own DISPFORM
+    field.  If a DISPFORM field is provided for this net, it will also
+    override this field.
+    Example:
+       defdispform = LABELBOX;
+
+
+DISPFORM  =  one of  DEFAULT, ABSENT, CIRCLE, LABEL, LABELBOX, BELIEFBARS
+
+    This specifies the general way all the nodes are to be displayed on the
+    screen and on printed diagrams.  The meaning of each possibility is 
+    explained in the "VNODE FIELDS" section, under "DISPFORM". 
+
+    This overrides the DISPFORM fields of all the nodes in this net.
+    It is usually used to temporarily display the net in a certain manner,
+    and then when it is removed (i.e. = DEFAULT, or statement does not appear),
+    each node will revert back to its own DISPFORM. 
+    If you plan to specify a single dispform value for all the nodes in the
+    net, which is to be the normal way of viewing them, don't use this field,
+    or the DISPFORM fields of the individual nodes, but rather use the
+    DEFDISPFORM field. 
+    The default value for this field is DEFAULT.
+    Example:
+       dispform = BELIEFBARS;
+
+
+DRAWINGBOUNDS  =  <coordinates>
+
+    This field provides the overall dimensions of the network diagram in "pixels"
+    (see the 'resolution' field for converting to millimeters or inches).
+    No object in the network may extend outside of this boundary.
+    Example:
+        drawingbounds = (1152, 752);
+
+
+GRIDSPACE  =  <coordinates>
+
+    When moving or placing a node (or other object) during visual network
+    editing, it is often convenient to have it automatically move to the
+    nearest position on a courser grid, so that things line up neatly.
+    This field determines how course that courser grid is. 
+
+    It consists of a list of two numbers; the first is the spacing (in pixels)
+    of vertical grid lines, and the second is the spacing of horizontal grid
+    lines.  This field may be specified even if the 'usegrid' field is false,
+    because it may be convenient to turn the grid off and on, but always
+    maintain the same grid spacing.
+    The default value for this field is system dependent, but may be 
+    resolution/10.
+    See also the 'usegrid' field.
+    Example:
+        gridspace = (6.0, 6.0);
+
+
+LINKFONT  =  <font>
+
+    The font to normally use when displaying the label of a link.
+    Example:
+        linkfont = font {shape = Courier;  size = 10;};
+
+
+LINKJOIN
+
+
+MAGNIFICATION  =  <number>
+
+    This field indicates if the screen view of the network is currently zoomed
+    in or zoomed out.
+    A magnification of m means everything on the screen appears m times larger
+    than normal.  It does not affect printed versions of the diagram.
+    The default value for this field is 1 (i.e., normal size).
+    See also the 'resolution' field.
+    Example:
+        magnification = 2.0;    // "zoomed in"
+        magnification = 0.5;    // "zoomed out"
+
+
+NODECOLORS  =  list of <color>
+NODEBORDERCOLOR  =  <color>
+LINKCOLOR  =  <color>
+BACKCOLOR  =  <color>
+COMMENTCOLOR  =  <color>
+PAGEBREAKCOLOR  =  <color>
+GROUPINGCOLOR  =  <color>
+
+
+NODEFONT  =  <font>
+
+    The font to normally use when displaying each nodes name, title, etc.
+    Example:
+        nodefont = font {shape = Times;  size = 12;};
+
+
+NODELABELING  =  one of  TITLE, NAME, NAMETITLE
+
+    This determines how the nodes will be labelled on the screen, and on
+    printed diagrams.
+    The choices are:
+        1. TITLE     - Use the TITLE field of the node.
+        2. NAME      - Use the NAME field of the node.
+        3. NAMETITLE - Make a label by concatenating the NAME and the TITLE
+                         fields of the node, separated by a colon.
+    Examples:
+        nodelabeling = NAME;        // Produces a display like:  SP
+        nodelabeling = TITLE;       // Produces a display like:  Spark Plugs
+        nodelabeling = NAMETITLE;   // Produces a display like:  SP:Spark Plugs
+
+
+RESOLUTION  =  <number>
+
+    This field provides the conversion from the "pixel" quantities
+    specified by many other fields, to physical dimensions on the printed
+    diagram of the network.  If the printing process is wysiwyg, then it will
+    also be the conversion factor for physical dimensions of drawings on the
+    screen.  Its units are pixels/inch.  The resolution in the horizontal
+    direction is the same as the resolution in the vertical direction. 
+    The default value for this field is system dependent.
+    See also the 'magnification' field.
+    Example:
+        resolution = 72.0;
+
+
+SCROLLPOSN  =  <coordinates>
+
+    During the visual editing and viewing of a network, it may be scrolled
+    around in its window.  This field specifies the recommended starting pixel
+    coordinates of the point in the network diagram which should be displayed
+    in the upper left corner of the window when it is first read from file
+    (which is usually the value it had when it was last saved to file). 
+    The default value for this field is (0, 0), which means the highest and
+    leftmost part of the diagram is displayed in the window at first.
+    Example:
+        scrollposn = (150, 220);
+
+
+SHOWPAGEBREAKS  =  <boolean>
+
+    If a network diagram is too large to fit on one printed page (as
+    determined by DRAWINGBOUNDS, RESOLUTION, and the printer's page size),
+    then each part of it is drawn on a separate page.  If this field is TRUE,
+    lines will be drawn over the network when it is displayed on the screen to
+    show where it gets divided to different pages.  It has no effect on
+    printed diagrams.
+    Example:
+        showpagebreaks = TRUE;
+
+
+USEGRID  =  <boolean>
+
+    When moving or placing a node (or other object) during visual network
+    editing, it is often convenient to have it automatically move to the
+    nearest position on a courser grid, so that things line up neatly.
+    This field controls whether these automatic movements happen or not. 
+    See also the 'gridspace' field.
+    Example:
+        usegrid = TRUE;
+
+
+USER  =  ?
+
+    This field is provided for the convenience of external developers.
+    By providing the appropriate parsing and printing routines, this field may
+    contain whatever is desired, possibly a large object with many fields.
+    Its syntax should conform to the "BNF GRAMMAR" section so that it may be
+    easily skipped by software that doesn't know how to read it.
+    See the "USER FIELDS" section.
+
+
+WINDOWPOSN  =  <rectangle>
+
+    During the visual editing and viewing of a network, the window displaying
+    it may be moved around the screen and resized.  This provides the
+    recommended starting position and size of the window (in global screen
+    coordinates) for when the network is first read from file (which is usually
+    its position when the network was last saved to file).
+    The list of 4 numbers specifies in order: 
+      horizontal distance from left of screen to left of window,
+      veritical distance from top of screen to top of window,
+      horizontal distance from left of screen to right of window,
+      vertical distance from top of screen to bottom of window.
+    If the 4 numbers are (l, u, r, b) then the size of the window is
+    (r - l) by (b - u).
+    The default value for this field is system dependent.
+    Example:
+        windowposn = (300, 0, 630, 220);
+
+
+
+VNODE FIELDS  (BNET.NODE.VISUAL or BNET.VISUAL.NODE)
+------------
+
+
+CENTER  =  <coordinates>
+    
+    This specifies the position of the node on the screen or printed diagram.
+    It gives the coordinates of the center of the node in "pixels" (see the vnet
+    field 'resolution' for converting to millimeters or inches).
+    The first number is the distance from the left hand side of the diagram, 
+    and the second is the distance from the top of the diagram.
+    Example:
+        center = (78, 150);
+
+
+DISPFORM  =  one of  DEFAULT, ABSENT, CIRCLE, LABEL, LABELBOX, BELIEFBARS
+
+    This specifies the general way the node is to be displayed on the screen
+    and on printed diagrams. It overrides the owning net's DEFDISPFORM field,
+    but not its DISPFORM field.
+    Possible values, and the resulting display, are:
+        DEFAULT      - Use the default display method (the net's DEFDISPFORM).
+        ABSENT       - Nothing.
+        CIRCLE       - A small circle.
+        LABEL        - The label of the node (see below).
+        LABELBOX     - The label of the node, surrounded by a box of the
+                          appropriate size, shape and color.
+        BELIEFBARS   - A small bar graph representing the belief in the
+                          values of the node.
+    The "label" of the node mentioned above is determined by the owning net's 
+    NODELABELING field.
+    If you plan to specify a single dispform value for all the nodes in the
+    net, which is to be the normal way of viewing them,
+    don't use this field, but rather use the owning net's DEFDISPFORM field.
+    The default value for this field is DEFAULT.
+    Example:
+        dispform = LABELBOX;
+
+
+HEIGHT  =  <integer>
+
+    If two nodes overlap, the one with greater height appears on top.
+    The lowest height number is 1.  Height numbers of nodes do not have to be
+    contiguous, but they should not be duplicated.
+    Example:
+        height = 3;
+
+
+HIDDEN  =  <boolean>
+
+    Whether to actually display the node or not, on the screen and on printed
+    diagrams.
+    The default value is FALSE (ie, display the node).
+    Example:
+        hidden = TRUE;
+
+
+SIZE  =  <coordinates>
+
+    This specifies the size of the node on the screen or printed diagram.
+    It is a list of two numbers; the first is the width, and the second is
+    the height of the node measured in "pixels" (see the vnet field
+    'resolution' for converting to millimeters or inches).  Usually this
+    field is not specified, and is determined by the displaying software based
+    on dispform, nodefont, and characteristics of the node such as name,
+    title, states, etc.
+    Example:
+        size = (32, 12);
+
+
+USER  =  ?
+
+    This field is provided for the convenience of external developers.
+    By providing the appropriate reading and printing routines, this field may
+    contain whatever is desired, possibly a large object with many fields.
+    Its syntax should conform to the "BNF GRAMMAR" section so that it may be
+    easily skipped by software that doesn't know how to read it.
+    See the "USER FIELDS" section.
+
+
+VLINK FIELDS  (BNET.NODE.VISUAL.LINK or BNET.VISUAL.NODE.LINK)
+------------
+
+
+HIDDEN  =  <boolean>
+
+    Whether to actually display the link or not, on the screen, and on printed
+    diagrams.
+    The default value is FALSE (ie, display the link).
+    Example:
+        hidden = TRUE;
+
+
+LABELPOSN  =  <rectangle>
+
+    This provides a bounding rectangle for the written label beside the link
+    if there is one.
+    The numbers respectively represent the distance from the left edge of
+    the label to the left edge of the diagram, from the top edge to the top
+    of the diagram, from the right edge to the left of the diagram, and from
+    the bottom edge to the top of the diagram.  All distances are in "pixels"
+    (see the vnet field 'resolution' for converting to millimeters or
+    inches). 
+    Example:
+        labelposn = (18, 310, 29, 322);
+
+
+LINEWIDTH  =  <number>
+
+    This specifies the width of the link in "pixels" (see the vnet field
+    'resolution' for converting to millimeters or inches).
+    Example:
+        linewidth = 3;
+
+
+PATH  =  list of <coordinates>
+
+    This is a  list of coordinate pairs.  The first pair specifies the starting
+    point of the link, each subsequent one is for a joint along the link,
+    and the last one is for the link endpoint (the tip of the arrow).
+    Each coordinate pair consists of two numbers, which are the distances from
+    the joint to the left and the top of the diagram in "pixels" (see the vnet
+    field 'resolution' for converting to millimeters or inches). 
+    Example:
+        path = ((78, 51), (204, 198), (253, 218));
+
+
+USER  =  ?
+
+    This field is provided for the convenience of external developers.
+    By providing the appropriate reading and printing routines, this field may
+    contain whatever is desired, possibly a large object with many fields.
+    Its syntax should conform to the "BNF GRAMMAR" section so that it may be
+    easily skipped by software that doesn't know how to read it.
+    See the "USER FIELDS" section.
+
+===============================================================================
+
+
+REQUIRED FIELDS
+---------------
+
+Some types of objects have "required fields", which always must be specified 
+when an object of that type is declared (otherwise an error is generated
+during reading). Required fields may be provided by inheritance.  If a field
+is not required, and it is not specified in the declaration, then it takes a
+default value, which may depend on the value of other fields, or on the state
+of the system (see the description of each field).  Any object class declared
+with a "define" has no required fields.
+
+The required fields for some types of objects are:
+
+    Object                     Required Fields
+    ------                     ---------------
+    bnet                       - none -
+    bnet.node                  kind, discrete, parents
+    bnet.param                 kind, discrete
+    bnet.visual                defdispform, nodelabeling, resolution
+    bnet.node.visual           - none -
+    bnet.node.visual.link      - none -
+
+===============================================================================
+
+
+FILE ORDER
+----------
+
+If B inherits from A, then the declaration for A must appear before the
+declaration for B in the file.
+
+The file will read the fastest if the nodes are ordered in the file so that
+all the parents of a node appear before that node.  When BNs are saved by the
+standard software, they are put in this order, so one way of ordering
+the nodes in a file is to read the file in and then save it (but you will lose
+any /**/ comments you have).
+
+There is no specially required order for the fields of a node, but the file
+will read fastest if each of the fields in the right column below, come before
+the field in the left column:
+
+    Field      Of                Is preceeded by
+    -----      --                ---------------
+    levels     bnet.node         discrete
+    functable  bnet.node         discrete, parents
+    probs      bnet.node         discrete, states or levels or numstates, parents
+    numcases   bnet.node         discrete, parents
+    evidence   bnet.node         discrete, states or levels or numstates
+    value      bnet.node         discrete, (levels)
+    visual     bnet.node         parents or inputs
+    
+===============================================================================
+
+
+WHITESPACE
+----------
+
+There may be any amount of "whitespace" in any location, except within names, 
+numbers, or strings (except see "STRING SYNTAX" section).
+
+Whitespace is spaces, tabs, carriage returns, or comments.
+
+There are a number of ways comments can be formed:
+          Starting symbol     Ending symbol
+                /*               */
+                //               end of line
+                /#               #/
+The starting symbol must be preceeded by a delimeter.
+Only /# #/ comments nest.
+Within a comment any symbol (except the ending symbol) may occur.
+
+===============================================================================
+
+
+SYNTAX OF <STRING>
+------------------
+
+This is designed to allow any unrestricted character string (or series of 
+bytes) to be expressed purely as a printable ascii text string, with a limited
+number of characters per line, conforming to structured indenting, and to be
+fairly readable if most of the characters to be represented actually are 
+printable ascii.
+
+A string consists of a double quote, followed by an unrestricted series of
+printable ascii characters (except double quotes) with any backslashes
+followed by one of the characters indicated below, and ending with a double
+quote.
+
+Non-printable characters, the double quote, and the backslash all must be
+expressed in backslash notation similar to C:
+  \n  -  newline         -  moves to beginning of next line
+  \t  -  tab             -  moves horizontally to next tab position
+  \f  -  form feed       -  starts a new screen or page
+  \b  -  backspace       -  moves back one space (without erasing)
+  \"  -  double quote    -  enters an actual "
+  \\  -  backslash       -  enters an actual \
+  \|  -  no character    -  skips \ and | without entering anything
+  \<whitespace>  -  no characters (whitespace includes tabs, newlines, etc.)
+  \<num>  -  any unrestricted character.  <num> is 2 hexadecimal digits (with
+               upper case alphas) specifying the character code.
+               Note: This is not in octal, like C.
+  \x<hexdigits>/  -  an unrestricted string.  <hexdigits> is a string of pairs 
+               of hexadecimal digits (upper case alphas) specifying the 
+               character code.  Within <hexdigits> there may be \<whitespace> 
+               (not breaking a pair), which represents no characters.
+               Note: This one is only proposed.  Any comments?
+
+Notice that \n means newline, i.e. move to beginning of next line.  No matter
+what operating system is being used, the character used to mean "move to
+beginning of next line" in a string should be \n  (not \r or \r\n).
+
+For DNET files in general, outside of strings, the character used to "move to
+the beginning of the next line" may vary between operating systems.  For
+Windows/DOS it will usually be ascii 13 (i.e. carriage return or control-M),
+followed by ascii 10 (i.e. line feed or control-J).  For Unix it will usually
+be just ascii 10, and for Macintosh ascii 13.  These characters will usually
+be automatically translated when copying the files from one operating system
+to another in ASCII mode.  In those cases where translation is a problem,
+ascii 10 should be used.
+
+In order to print long strings to file without exceeding a certain line
+length, it is necessary to put the string on several lines.  Since we don't
+want the line break to be part of the string, we escape it using
+\<whitespace>.  This also allows the succeeding lines to be properly indented,
+because the indent gets consumed as whitespace.  If the first part of the
+string on succeeding lines starts with whitespace, we must prefix it with a \|
+so that whitespace doesn't inadvertantly get consumed with the indent (see the
+"equation" example below).
+
+
+EXAMPLES
+--------
+
+    title = "Car Buyer";
+
+    comment = "Represents the working relationships between parts of a \
+        1983 manual Honda Accord.\n\
+        All probabilities are supposed to be over all cars brought \
+        into a Honda dealership for repair.\n\
+        Copyright 1992-1994 Brent Boerlage";
+
+    title = "% increase of\n micromorts/hour";
+
+    comment = "Ross Shachter's \"favourite\" influence diagram.";
+
+    equation = "P (N | N1) = NormalDist (N,\n\
+        \|   N1 + (sqrt(ddg)/(10+sqrt(ddg))) * (20 - N1),\n\
+        \|   (sqrt(ddg)/(10+sqrt(ddg))) * 3)";
+
+
+===============================================================================
+
+
+PARSING TESTS
+-------------
+
+This document is usually distributed simultaneously with two sets of files
+that may be used as parsing test suites.
+
+Those files starting with the letter "P" should parse correctly.  Each is
+designed to test some aspect of parsing relatively independently.  The number
+following the P in the file name gives some indication of how advanced the
+feature its testing is, with higher numbers corresponding to more advanced
+features.
+
+Those files starting with the letter "B" have some sort of mistake within them
+that violates the DNET file format.  Good parsing software should detect the
+mistake, report it, and recover gracefully.  The file "Bad_DNET_Key" describes
+what is wrong in each test file.  The numbering scheme is similar to that used
+for the "P" files.
+
+===============================================================================
+
+
+FEEDBACK
+--------
+
+Please send any suggestions for changes to the DNET format to
+boerlage@norsys.com.
+
+All suggestions will be considered, and particularily good suggestions, or
+very popular suggestions, will result in a change to the format.
+
+===============================================================================
+
+
+REFERENCES
+----------
+
+Cooper, Gregory F. (1984) NESTOR: A computer-based medical diagnostic aid that
+integrates causal and probabilistic knowledge, PhD. thesis, Rep. No.
+STAN-CS-84-48 (also HPP-84-48), Dept. of Computer Science, Stanford Univ., CA.
+
+Lauritzen, Steffen L. and David J. Spiegelhalter (1988) "Local computations
+with probabilities on graphical structures and their application to expert
+systems" in J. Royal Statistics Society B, 50(2), 157-194.
+
+Neapolitan, Richard E. (1990) Probabilistic Reasoning in Expert Systems:
+Theory and Algorithms , John Wiley & Sons, New York.
+
+Pearl, Judea (1988a) Probabilistic Reasoning in Intelligent Systems: Networks
+of Plausible Inference, Morgan Kaufmann, San Mateo, CA.
+
+Zhang, Lianwen (Nevin) (1993) A computational theory of decision networks, PhD
+thesis, Dept. of Computer Science, Univ. of British Columbia, BC, Canada.
+
+===============================================================================
+
+
+EXAMPLES OF DNETS
+-----------------
+
+Many more examples can be found in the network library at:
+http://www.norsys.com
+
+
+bnet Cancer {
+    comment = "Originally from Cooper84 (PhD thesis), but it has appeared in \
+        Spiegelhalter86, Pearl88 (book, p.196), & Neapolitan90 (book, p.179).";
+    
+    node A {
+        title = "Metastatic Cancer";
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = ();
+        probs = 
+            // Present      Absent       
+              (0.2,         0.8);
+        };
+    
+    node B {
+        title = "Serum Calcium";
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Increased, Not_Increased);
+        parents = (A);
+        probs = 
+            // Increased    Not_Increased  // A       
+             ((0.8,         0.2),          // Present 
+              (0.2,         0.8));         // Absent
+        };
+    
+    node C {
+        title = "Brain Tumor";
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = (A);
+        probs = 
+            // Present      Absent         // A       
+             ((0.2,         0.8),          // Present 
+              (0.05,        0.95));        // Absent  ;
+        };
+    
+    node D {
+        title = "Coma";
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = (C, B);
+        probs = 
+            // Present      Absent          // C       B             
+            (((0.8,         0.2),           // Present Increased     
+              (0.8,         0.2)),          // Present Not_Increased 
+             ((0.8,         0.2),           // Absent  Increased     
+              (0.05,        0.95)));        // Absent  Not_Increased ;
+        };
+    
+    node E {
+        title = "Severe Headaches";
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Present, Absent);
+        parents = (C);
+        probs = 
+            // Present      Absent         // C       
+             ((0.8,         0.2),          // Present 
+              (0.6,         0.4));         // Absent  ;
+        comment = "This node is also known as 'Papilledema'.";
+        };
+    };
+
+
+bnet Umbrella {
+    autoupdate = TRUE;
+    comment = "An example influence diagram that Ross Shachter often uses.";
+    node Weather {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Sunshine, Rain);
+        parents = ();
+        probs = 
+            // Sunshine    Rain 
+              (0.7,        0.3);
+        };
+    node Forecast {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (Sunny, Cloudy, Rainy);
+        parents = (Weather);
+        probs = 
+            // Forecast:
+            // Sunny        Cloudy       Rainy        // Weather:
+             ((0.7,         0.2,         0.1),        // Sunshine 
+              (0.15,        0.25,        0.6));       // Rain
+        };
+    node Take_Umbrella {
+        kind = DECISION;
+        discrete = TRUE;
+        states = (Take_It, Leave_It_Home);
+        parents = (Forecast);
+        };
+    node Satisfaction {
+        kind = UTILITY;
+        discrete = FALSE;
+        chance = DETERMIN;
+        parents = (Weather, Take_Umbrella);
+        functable = 
+            // Satisfaction: // Weather:  Take_Umbrella:
+             ((20,           // Sunshine  Take_It       
+               100),         // Sunshine  Leave_It_Home 
+              (70,           // Rain      Take_It       
+               0));          // Rain      Leave_It_Home
+        };
+    };
+
+
+bnet VirtualEvidence {
+    define node tf {                  // "define" just defines a class of nodes
+        kind = NATURE;
+        discrete = TRUE;
+        states = (True, False);
+        };
+    define node observeA (tf) {       // "observeA" inherits from "tf"
+        parents = (A);
+        probs = ((0.7), (0.2));
+        };
+    node A (tf) {                     // This is the node being observed
+        parents = ();
+        };
+    node B00 (observeA) {};
+    node B01 (observeA) {};
+    };
+
+
+bnet Fire {
+    comment = "From: Poole, David and Eric Neufeld (1988)";
+    define node tf {
+        kind = NATURE;
+        discrete = TRUE;
+        states = (True, False);
+        };
+    node Tampering (tf) {
+        parents = ();
+        probs = (.02, .98);
+        };
+    node Fire (tf) {
+        parents = ();
+        probs = (.01, .99);
+        };
+    node Alarm (tf) {
+        parents = (Fire, Tampering);
+        probs = (((.5,.5), (.99,.01)), ((.85,.15), (.0001,.9999)));
+        };
+    node Smoke (tf) {
+        parents = (Fire);
+        probs = ((.9, .1), (.01, .99));
+        };
+    node Leaving (tf) {
+        parents = (Alarm);
+        probs = ((.88, .12), (.001, .999));
+        };
+    node Report (tf) {
+        parents = (Leaving);
+        probs = ((.75, .25), (.01, .99));
+        };
+    };
+
+
+bnet Car_Buyer_Neapolitan {
+    autoupdate = TRUE;
+    comment = "Car buying example from Neapolitan90, p.380. This is a \
+        simpler version inspired by\n\
+        \tthe car buyer example of Howard62, p. 702.";
+    whenchanged = 891177535;
+
+    visual V1 {
+        defdispform = LABELBOX;
+        nodelabeling = NAMETITLE;
+        nodefont = font {shape= "Arial"; size= 10;};
+        linkfont = font {shape= "Arial"; size= 9;};
+        commentfont = font {shape= "Arial"; size= 10;};
+        windowposn = (17, 15, 474, 340);
+        resolution = 72;
+        drawingbounds = (1152, 752);
+        showpagebreaks = FALSE;
+        usegrid = TRUE;
+        gridspace = (6, 6);
+        };
+
+    node C {
+        kind = NATURE;
+        discrete = TRUE;
+        chance = CHANCE;
+        states = (Good, Lemon);
+        parents = ();
+        probs = 
+            // Good         Lemon        
+              (0.8,         0.2);
+        title = "Condition";
+        visual V1 {
+            center = (90, 42);
+            height = 2;
+            };
+        };
+
+    node D {
+        kind = DECISION;
+        discrete = TRUE;
+        states = (None, First, Both);
+        parents = ();
+        title = "Do Tests?";
+        visual V1 {
+            center = (282, 42);
+            height = 4;
+            };
+        };
+
+    node T {
+        kind = NATURE;
+        discrete = TRUE;
+        chance = CHANCE;
+        states = (Not_Done, Positive, Negative);
+        parents = (C, D);
+        probs = 
+            // Not_Done     Positive     Negative        // C     D     
+            (((1,           0,           0),             // Good  None  
+              (0,           0.9,         0.1),           // Good  First 
+              (0,           0.9,         0.1)),          // Good  Both  
+             ((1,           0,           0),             // Lemon None  
+              (0,           0.4,         0.6),           // Lemon First 
+              (0,           0.4,         0.6)));         // Lemon Both  ;
+        title = "First Test";
+        visual V1 {
+            center = (90, 138);
+            height = 1;
+            };
+        };
+
+    node S {
+        kind = NATURE;
+        discrete = TRUE;
+        chance = CHANCE;
+        states = (Not_Done, Positive, Negative);
+        parents = (T, C, D);
+        probs = 
+            //  Not_Done     Positive     Negative         // T        C     D     
+            ((((1,           0,           0),              // Not_Done Good  None  
+               (@imposs,     @imposs,     @imposs),        // Not_Done Good  First 
+               (@imposs,     @imposs,     @imposs)),       // Not_Done Good  Both  
+              ((1,           0,           0),              // Not_Done Lemon None  
+               (@imposs,     @imposs,     @imposs),        // Not_Done Lemon First 
+               (@imposs,     @imposs,     @imposs))),      // Not_Done Lemon Both  
+             (((@imposs,     @imposs,     @imposs),        // Positive Good  None  
+               (1,           0,           0),              // Positive Good  First 
+               (0,           0.8888889,   0.1111111)),     // Positive Good  Both  
+              ((@imposs,     @imposs,     @imposs),        // Positive Lemon None  
+               (1,           0,           0),              // Positive Lemon First 
+               (0,           0.3333333,   0.6666667))),    // Positive Lemon Both  
+             (((@imposs,     @imposs,     @imposs),        // Negative Good  None  
+               (1,           0,           0),              // Negative Good  First 
+               (0,           1,           0)),             // Negative Good  Both  
+              ((@imposs,     @imposs,     @imposs),        // Negative Lemon None  
+               (1,           0,           0),              // Negative Lemon First 
+               (0,           0.4444444,   0.5555556))));   // Negative Lemon Both  ;
+        title = "Second Test";
+        visual V1 {
+            center = (282, 138);
+            height = 3;
+            };
+        };
+
+    node B {
+        kind = DECISION;
+        discrete = TRUE;
+        states = (Buy, Dont_Buy);
+        parents = (D, T, S);
+        title = "Buy It?";
+        visual V1 {
+            center = (138, 228);
+            height = 5;
+            };
+        };
+
+    node V {
+        kind = UTILITY;
+        discrete = FALSE;
+        chance = DETERMIN;
+        parents = (C, D, B);
+        functable = 
+                               // C     D     B        
+            (((60,             // Good  None  Buy      
+               0),             // Good  None  Dont_Buy 
+              (51,             // Good  First Buy      
+               -9),            // Good  First Dont_Buy 
+              (47,             // Good  Both  Buy      
+               -13)),          // Good  Both  Dont_Buy 
+             ((-100,           // Lemon None  Buy      
+               0),             // Lemon None  Dont_Buy 
+              (-109,           // Lemon First Buy      
+               -9),            // Lemon First Dont_Buy 
+              (-113,           // Lemon Both  Buy      
+               -13)));         // Lemon Both  Dont_Buy ;
+        visual V1 {
+            center = (330, 228);
+            height = 6;
+            link 1 {
+                path = ((96, 51), (222, 198), (314, 224));
+                };
+            link 2 {
+                path = ((298, 52), (378, 96), (378, 198), (344, 219));
+                };
+            };
+        };
+    };
+
+
+
