@@ -19,10 +19,17 @@ easier.  The easiest way to install this is with pip.
    pip install pyPEG2
    
 
-
+:comment:  Yes I could have parsed this file using something like ply, pypeg, 
+           pybison, etc.  I did take a look at a number of these parsing libraries
+           and was un-able to figure them out.  In the end I was able to write my own 
+           parser in way less time then it would have taken to figure out one
+           of these frameworks.  :(  I'd be happy to try a different way if someone  
+           can get me started quickly with some demo's.
+           
 API DOC:
 ===============     
 """
+
 import re
 import sys
 
@@ -44,7 +51,7 @@ class parseDNET(object):
     # used to help with recursive development of the structure.
     struct = {}
     curStruct = None
-    
+    prevStruct = None
     
     def __init__(self, inputDnetFile):
         self.inputDnetFile = inputDnetFile
@@ -60,6 +67,7 @@ class parseDNET(object):
         self.re_propertyAssign = re.compile("^\s*\w+\s*=\s*[A-Z]+;")
         self.re_startMultiLine = re.compile("^\s*\w+\s*=\s*$")
         self.re_structStartMultiLine = re.compile("^\s*\w+\s+\w+\s+\{\s*$")
+        self.re_multiLineStringStart = re.compile('^\s*\w+\s*=\s*\".*\\$')
         
     def parseLine(self):
         # only called when the structure is initialised, should only happen once
@@ -76,8 +84,13 @@ class parseDNET(object):
                 print 'start data sturct:', line
                 type = line.split(' ')[0]
                 name = line.split(' ')[1]
+                self.prevStruct = self.curStruct
                 if not self.curStruct.has_key(type):
                     self.curStruct[type] = {}
+                if not self.curStruct[type].has_key(name):
+                    self.curStruct[type][name] = {}
+                self.parseLine(line)
+                    
                 
                 
             # is the line  a comment, if so ignore

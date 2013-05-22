@@ -2,6 +2,10 @@
 Created on 2013-05-14
 
 @author: kjnether
+
+
+
+
 '''
 import unittest
 import DNETParser
@@ -106,6 +110,25 @@ class TestParser(unittest.TestCase):
             retVal = self.parseObj.re_structStartMultiLine.match(line2Fail)
             errMsg = 'input line (' +  line2Fail + ') is  matched by the regular expression but it should not be'
             self.assertIsNone(retVal, errMsg)
+            
+    def testMultiLineStringStart(self):
+        inputData = ['comment = "An example influence diagram for Joe, who has to decide \\',
+                     'whether to buy a certain used car which may be a \'peach\' or a \\',
+                     '\'lemon\'.  He has the option of doing some tests beforehand, \\',
+                     'and of buying it with a guarantee or not.\n\\',
+                     'This is the classic example of an influence diagram derived \\',
+                     'from a decision problem with a very asymmetric decision tree, \\',
+                     'since if Joe decides not to test then the test results have \\',
+                     'no meaning, etc.\n\\',
+                     'This problem was posed (in decision tree representation) by \\',
+                     'Howard62, and is described as an influence diagram in Qi94 \\',
+                     'and in SmithHM93.";]']
+        
+        for line in inputData:
+            if self.parseObj.re_multiLineStringStart(line):
+                
+        
+        reObj = re.compile('^\s*\w+\s*=\s*\".*\\$')
 
 
 if __name__ == "__main__":
