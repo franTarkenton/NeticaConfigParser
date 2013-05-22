@@ -27,6 +27,25 @@ import re
 import sys
 
 class parseDNET(object):
+    inputDnetFile = ''
+    
+    # regular expressions used my class
+    re_comments = None
+    re_propertyAssign = None
+    re_startMultiLine = None
+    re_structStartMultiLine = None
+    
+    # variables that are used by objects to help 
+    # with the parsing.
+    prevLine = ''
+    curLine = ''
+    fh = None
+    
+    # used to help with recursive development of the structure.
+    struct = {}
+    curStruct = None
+    
+    
     def __init__(self, inputDnetFile):
         self.inputDnetFile = inputDnetFile
         
@@ -42,8 +61,29 @@ class parseDNET(object):
         self.re_startMultiLine = re.compile("^\s*\w+\s*=\s*$")
         self.re_structStartMultiLine = re.compile("^\s*\w+\s+\w+\s+\{\s*$")
         
-    
-        
+    def parseLine(self):
+        # only called when the structure is initialised, should only happen once
+        if self.curStruct == None:
+            self.curStruct = self.struct
+            
+        line = self.fh.readline()
+        if line:
+            line = line.replace("\n", "")
+            if self.re_comments.match(line):
+                print 'comment: ', line
+                self.parseLine()
+            elif self.re_structStartMultiLine.match(line):
+                print 'start data sturct:', line
+                type = line.split(' ')[0]
+                name = line.split(' ')[1]
+                if not self.curStruct.has_key(type):
+                    self.curStruct[type] = {}
+                
+                
+            # is the line  a comment, if so ignore
+            
+            # if the line is the start of a struct, 
+            
         
     def parse(self):
         bnet = {}
