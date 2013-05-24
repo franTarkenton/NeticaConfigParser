@@ -69,7 +69,7 @@ class parseDNET(object):
         self.re_singleLineProperty = re.compile(r'^\s*\w+\s*=\s*(?!TRUE|FALSE)[a-zA-Z]+\;{1}$')
         self.re_singleLineBooleanProperty = re.compile('^\s*\w+\s*=\s*(TRUE|FALSE){1}\;{1}$')
         self.re_singleLineNumericProperty = re.compile('^\s*\w+\s*=\s*\d+\.*\d*\;{1}$')
-        self.re_singleLineListNumbers = re.compile('^\s*\w+\s*=\s*\({1}(\d)+\){1}\;{1}$')
+        self.re_singleLineListNumbers = re.compile('^\s*\w+\s*=\s*\({1}\d+(\,\d+)*\){1}\;{1}$')
         
                 
     def parseLine(self):

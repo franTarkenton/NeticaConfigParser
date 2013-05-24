@@ -300,7 +300,7 @@ class TestParser(unittest.TestCase):
             
     def testSingleLineListNumbers(self):
         self.parseObj.buildRegularExpressions()
-        matchLines = [5,6,9]
+        matchLines = [9]
         lineNum = 0
         for line in self.testData:
             retVal = self.parseObj.re_singleLineListNumbers.match(line)
