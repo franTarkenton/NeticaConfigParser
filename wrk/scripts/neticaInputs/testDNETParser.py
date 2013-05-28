@@ -33,9 +33,17 @@ class TestParser(unittest.TestCase):
                    "            };",
                    "     height = 5980;", 
                    "     testfloatValueThatICreated = 5.5;",
+                   "      probs = ", 
+                   "      // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    ",
+                   "      (((1,           0,           0,           0),             // NoTest       Peach ",
+                   "      (1,           0,           0,           0)),            // NoTest       Lemon ",
+                   "      ((0,           0.9,         0.1,         0),             // Steering     Peach ",
+                   "      (0,           0.4,         0.6,         0)),            // Steering     Lemon ",
+                   "      ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach ",
+                   "      (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon ",
+                   "      ((0,           0.9,         0.1,         0),             // Transmission Peach ",
+                   "      (0,           0.4,         0.6,         0)));           // Transmission Lemon ;",
                    " };"]
-
-
 
     def testCommentRegExpr(self):
         self.parseObj.buildRegularExpressions()
@@ -312,6 +320,90 @@ class TestParser(unittest.TestCase):
                 self.assertIsNone(retVal, msg)
             lineNum += 1
             
+    def testSingleLineListStrings(self):
+        self.parseObj.buildRegularExpressions()
+        matchLines = [5,6] #9
+        lineNum = 0
+        for line in self.testData:
+            retVal = self.parseObj.re_singleLineListProperties.match(line)
+            if lineNum in matchLines:
+                 msg = 'This line should have matched! (' + str(line) + ')' 
+                 self.assertNotEqual(retVal, None, msg)
+            else:
+                msg = 'This line should not have matched but it did (' + str(line) + ')'
+                self.assertIsNone(retVal, msg)
+            lineNum += 1
+
+    def testsingleLineListParser(self):
+        '''
+        test the single line list parser method.  Should
+        parse lines like this:
+        
+        var = (32,23,23) into
+        'var' and [32,23,23]
+        '''
+        indata = ["parents = (T1, R1)", 
+                  "states = (NoTest, Differential)",
+                  "center = (306, 60)"]
+        
+        outdata = [["parents", ['T1', 'R1']],
+                   ['states', ['NoTest', 'Differential']],
+                   ['center', [306, 60]]]
+        
+        types = [str, str, int]
+        lineCnt = 0
+        for line in indata:
+            expecVar = outdata[lineCnt][0]
+            expecLst = outdata[lineCnt][1]
+            
+            retVar, retList = self.parseObj.singleLineListParser(line)
+            
+            print 'line', line
+            print 'retVar', retVar
+            print 'retList', retList
+            
+            msg1 = 'return value is (' + str(retVar) + ') expected value is (' + \
+                  expecVar + ')'
+            self.assertEqual(retVar, expecVar, msg1)
+            msg2 = 'return value is (' + str(retList) + ') expected value is (' + \
+                  str(expecLst) + ')'            
+            self.assertEqual(retList, expecLst, msg2)
+            msg3 = 'The list that was created did not do the type conversion ' + \
+                  'correctly!'
+            for var in retList:
+                self.assertTrue(isinstance(var, types[lineCnt]), msg3)
+            lineCnt += 1
+            
+    def testre_startMultiLineDataStruct(self):
+        '''
+        testing the regular expression to ensure that it 
+        will capture the start of a multiline data struct
+        or at least what could be the start of a multiline 
+        data struct.
+        '''
+        self.parseObj.buildRegularExpressions()
+        matchLines = [14]
+        lineNum = 0
+
+        for line in self.testData:
+            retVal = self.parseObj.re_startMultiLineDataStruct.match(line)
+            if lineNum in matchLines:
+                 msg = 'This line should have matched! (' + str(line) + ')' 
+                 self.assertNotEqual(retVal, None, msg)
+            else:
+                msg = 'This line should not have matched but it did (' + str(line) + ')'
+                self.assertIsNone(retVal, msg)
+            lineNum += 1
+        
+        
+        
+        
+    # TODO: could try to convert the regular expressions to pull out
+    #       structures from the file after it has been 
+    #       loaded into memory!  Set up to parse multilines
+    #       just an idea at this point
+            
+            
         
 
         
@@ -326,7 +418,7 @@ if __name__ == "__main__":
     #testSuite.addTest(TestParser('testCommentRegExpr'))
     #testSuite.addTest(TestParser('testPropertyAssignment'))
     #testSuite.addTest(TestParser('testMultiline'))
-    testSuite.addTest(TestParser('testSingleLineListNumbers'))
+    testSuite.addTest(TestParser('testre_startMultiLineDataStruct'))
     unittest.TextTestRunner(verbosity=2).run(testSuite)
     
     

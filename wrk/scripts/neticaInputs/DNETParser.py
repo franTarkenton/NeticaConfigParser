@@ -69,8 +69,12 @@ class parseDNET(object):
         self.re_singleLineProperty = re.compile(r'^\s*\w+\s*=\s*(?!TRUE|FALSE)[a-zA-Z]+\;{1}$')
         self.re_singleLineBooleanProperty = re.compile('^\s*\w+\s*=\s*(TRUE|FALSE){1}\;{1}$')
         self.re_singleLineNumericProperty = re.compile('^\s*\w+\s*=\s*\d+\.*\d*\;{1}$')
-        self.re_singleLineListNumbers = re.compile('^\s*\w+\s*=\s*\({1}\d+(\,\d+)*\){1}\;{1}$')
-        
+        self.re_singleLineListNumbers = re.compile(r'^\s*\w+\s*={1}\s*\({1}\s*[0-9]+(\s*,{1}\s*[0-9]+)*\s*\){1}\s*\;{1}\s*$')
+        self.re_singleLineListProperties = re.compile(r'^\s*\w+\s*={1}\s*\({1}\s*(?![0-9]+)[0-9a-zA-Z]+(\s*,{1}\s*(?![0-9]+)[0-9a-zA-Z]+)*\s*\){1}\s*\;{1}\s*$')
+        self.re_startMultiLineDataStruct = re.compile(r'^\s*\w+\s*=\s*$')
+        # TODO: the re_startMultiLineDataStruct matches 'var = ' followed by nothing.  May need to 
+        #       create another regex to detect the start of a multiline data struct that looks for the 
+        #       // column headers on the following line.
                 
     def parseLine(self):
         # only called when the structure is initialised, should only happen once
@@ -140,19 +144,112 @@ class parseDNET(object):
                     self.curStruct[varName] = float(value)
                 else:
                     self.curStruct[varName] = int(value)
-            elif self.re_singleLineList.match(line):
+            elif self.re_singleLineListNumbers.match(line):
+                varName, value = self.singleLineListParser()
+                self.curStruct[varName] = value
+            elif self.re_singleLineListProperties.match(line):
+                # down the road may want to look into putting a 
+                # special flag as these properties reference other
+                # nodes.  Maybe maintain a parent list or something, 
+                # maybe not, we'll see once we start working with it
+                varName, value = self.singleLineListParser()
+                self.curStruct[varName] = value
+            elif self.re_startMultiLineDataStruct.match(line):
+                # once the startline is detected need to:
+                #  a) get the rest of the data into memory
+                #  b) get the 
+                # rest of
+                
+                
                 pass
+            # next is the multiline multidimension data structure!
+            # step1 detect start of a multiline / tabular data struct!
+            #       these tend to start with 'var = ' followed by 
+            #       nothing!
             
             
                 
             
 
             
-                
-            # dictionary of values
-            # list of values
+            # list of lists, exeample:
+            # path = ((111, 51), (168, 18), (42,....
             # end of a struct
-            # boolean values
+            
+    def readRestOfMultiLineStruct(self, line):
+        '''
+        multiline data structures look like this:
+        
+            probs = 
+        // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
+        (((1,           0,           0,           0),             // NoTest       Peach 
+          (1,           0,           0,           0)),            // NoTest       Lemon 
+         ((0,           0.9,         0.1,         0),             // Steering     Peach 
+          (0,           0.4,         0.6,         0)),            // Steering     Lemon 
+         ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
+          (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
+         ((0,           0.9,         0.1,         0),             // Transmission Peach 
+          (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
+
+
+        The structure is:
+            probs = (This is the name of the variable or the declaration of the property)
+            // NoResult NoDefects ... // NODE  NODE (describes the order of the states 
+            // ((( 1,0,0,0), // NoTest  Peach (Describes the probability for NoTest Peach combination
+                 ( 1,0,0,0)), // NoTest Lemon (Describes the probaility for NoTest Lemon combination
+                                 the 1 indicates that the result of this combination will always 
+                                 result in a NoResult state.  Lower down (3rd row) the .9 indicates
+                                 a 90% probability for NoDefects when T1= Steering and CC = Peach
+                                 and 10% probability for OneDefect when T1=Steering and CC = Peach
+                 
+        
+        '''
+            
+    def singleLineListParser(self, line):
+        '''
+        recieves a line for the dnet file that contains a 
+        list of values. The input line will look similar to
+        one of the following:
+        
+        parents = (T1, R1)
+        states = (NoTest, Differential)
+        center = (306, 60)
+        
+        This method will return the variable 
+        name as the first arg and a python list as the second.
+        If the list is made up of numbers the method will 
+        handle the type conversions (string to int), and will
+        return a list of numbers.
+        
+        If the list is made up of a list of property names
+        then it will return just that, a list of properties 
+        as strings.
+        '''
+        varName = line.split('=')[0].strip()
+        value = line.split('=')[1].strip()
+        if value[0] == '(':
+            value = value[1:]
+        if value[len(value) - 1] == ')':
+            value = value[0:len(value) - 1]
+        valList = value.split(',')
+        cnt = 0
+        for val in valList:
+            val = val.strip()
+            # is the val a number?
+            if val.isdigit():
+                val = int(val)
+            elif val.replace('.', '').isdigit():
+                val = float(val)
+            valList[cnt] = val
+            cnt += 1
+        # TODO: need to write a test for this method
+        # var = (1,2,3) should return [1,2,3]
+        # var = (once, twice) should return ['once', 'twice')
+        # var = (1.1, 23.23423) should return [1.1, 23.23423]
+        # test should verify the type conversion as well as the 
+        # conversion to the list.
+        return varName, valList
+        
             
     def singleLineStringParser(self, line):
         '''
