@@ -1,6 +1,6 @@
 // ~->[DNET-1]->~
 
-// File created by Norsys using Netica 1.06b on Mar 29, 1998 at 05:12:55.
+// File created by Norsys using Netica 1.06b on Mar 29, 1998 at 05:12:55. 
 
 bnet Car_Buyer {
 autoupdate = TRUE;
