@@ -443,7 +443,7 @@ class DNETStructParser():
         print startEnd
         # now that I know where the startChar and endChars are located
         # the next step is to stuff them into a hierarchical data structure
-        self.restruct(startEnd)
+        hierarchDataStruct = self.restruct(startEnd)
                     
     def restruct(self, elemList):
         struct = self.defaultLine
@@ -506,8 +506,6 @@ class DNETStructParser():
         print '------------------------888------------------------------'
         startElemObj.printData(startElemObj)
         return startElemObj
-    
-            
             
 class DNETStruct():
     
@@ -531,19 +529,39 @@ class DNETStruct():
         self.pointer = self.prev
         
 class elementObject():
+    '''
+    This class is used to store hierarchical data structures
+    that are found in the netica .dnet files.  These files contain
+    information that describes the baysian belief network.
     
-#     startLine = None
-#     startCol = None
-#     endLine = None
-#     endCol = None
-#     
-#     parents = []
-#     children = []
-#     
-#     childPointer = None
-#     parentPointer = None
+    7-30-2013 - At the moment the only information that is stored is the 
+                start end end points of the data structures.  the next step 
+                will be to extend this class to allow for the storing of 
+                actual information from the netica file.
+    
+    :ivar childPointer: This is an integer that points to the index position 
+                        of the current child.
+    :ivar children: This is a list made up of elementObjects (like this one
+                    that is being described here) that are children of the 
+                    current object
+    :ivar endCol: Marks the column in the text file that the end of the 
+                  current data structure occurs on.
+    :ivar endLine: Marks the line in the text file that corresponds with the
+                   end of the current data structure.
+    :ivar parentPointer:  a pointer to the current parent.  This could probably
+                          be removed down the road seeing as any one object
+                          can only have one parent.
+    :ivar parents: This is a list (only made up of one element, which is the parent
+                   of the current object.
+    :ivar startCol: The start column of the current data structure
+    :ivar startLine: The start line of the current data structure.
+    '''
+    
     
     def __init__(self):
+        '''
+        The constructor, initializes the class variables to null's
+        '''
         # instantiate instance vars
         self.startLine = None
         self.startCol = None
@@ -557,20 +575,54 @@ class elementObject():
         self.parentPointer = None
     
     def setStart(self, line, col):
+        '''
+        receives the start line and column for the current data 
+        structure that is described by this object.
+        
+        :param  line: an integer that identifies the start line of the
+                      data structure that is described by this object.
+        :type line: integer
+        :param  col: an integer that identifies the start column of the 
+                     data structure that is described by this object.
+        :type col: integer
+        '''
         self.startLine = line
         self.startCol = col
         
     def setEnd(self, line, col):
+        '''
+        Sets the end column and line for the data structure that is 
+        described by this object.
+                
+        :param  line: an integer that identifies the end line of the 
+                     data structure that is described by this object.
+        :type line: integer
+        :param  col: an integer that identifies the end column of the 
+                     data structure that is described by this object.
+        :type col: integer
+        '''
         self.endLine = line
         self.endCol = col
         
     def getChildren(self):
+        '''
+        Returns a list of elementObject's that are children
+        of the current object.
+       
+        :returns: a list of elementObjects that are children of the 
+                  current object.
+        :rtype: list of elementObjects
+        '''
         return self.children
-    
-    def getParents(self):
-        return self.parents
-    
+        
     def getParent(self):
+        '''
+        returns the parent of the current object
+        
+        :returns: an elementObjects that is the parent of the current 
+                  object
+        :rtype: elementObjects
+        '''
         self.parentPointer = len(self.parents) - 1
         print self.parentPointer
         if self.parentPointer > 0:
@@ -583,33 +635,75 @@ class elementObject():
         return retObj
     
     def getChild(self):
+        '''
+        Returns the current child of this elementObject.
+       
+        :returns: an elementObjects that is the child of the current
+                  object.
+        :rtype: elementObjects
+        '''
         retObj = self.children[self.childPointer]
         self.childPointer -= 1
         return retObj
     
     def addParent(self, parentObj):
+        '''
+        Receives an elementObject that is the parent of the 
+        current object and stores this in a property of the current
+        object
+        
+        :param  parentObj: elementObjects that is the parent of the 
+                           the current object.
+        :type parentObj: elementObjects
+        '''
         # need to verify whether this parent already exists
         self.parents.append(parentObj)
         self.parentPointer = len(self.parents) - 1
         
     def addChild(self):
+        '''
+        Adds a child elementObject to the current object and returns the
+        child elementObject that was just created.        
+        
+        :returns: an element object that is a child of the current object
+        :rtype: elementObject
+        '''
         childObj = elementObject()
         childObj.addParent(self)
         self.children.append(childObj)
         self.childPointer = len(self.children) - 1
         return childObj
-        
-    def setPointerToChild(self):
-        childObj = elementObject()
-        self.addChild(childObj)
-        
+                
     def setStartAndEnd(self, startLine, startCol, endLine, endCol):
+        '''
+        This method sets the start line, start column, end line and end
+        column for the current elementObject.
+                
+        :param  startLine: the line the structure that is being described 
+                           starts on.
+        :type startLine: integer
+        :param  startCol: the column that the data sturcture starts on.
+        :type startCol: integer
+        :param  endLine: the end line
+        :type endLine: integer
+        :param  endCol: the end column 
+        :type endCol: integer
+        '''
         self.startLine = startLine
         self.startCol = startCol
         self.endLine = endLine
         self.endCol = endCol
         
     def printProperties(self):
+        '''
+        Prints the:
+            - start line
+            - start column
+            - end line
+            - end column
+        
+        for the current object.
+        '''
         lbl = ['startline', 'startcol', 'endline', 'endcol']
         vals = []
         cnt = 0
@@ -621,9 +715,15 @@ class elementObject():
                 vals.append('NONE')
             print lbl[cnt], ' - ', vals[cnt]
             cnt += 1        
-        return
         
     def printData(self, startObj):
+        '''
+        recursively prints the children of the current object.  Prints
+        the current object as well as any child objects
+        
+        :param  startObj: the object that is to be printed
+        :type startObj: elementObject
+        '''
         startObj.printProperties()
         for child in startObj.getChildren():
             #child.printProperties()
