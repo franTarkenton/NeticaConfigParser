@@ -49,11 +49,45 @@ class parseDNET(object):
     
     # used to help with recursive development of the structure.
     struct = {}
+    structsStartStop = {}
     curStruct = None
     prevStruct = None
     
     def __init__(self, inputDnetFile):
         self.inputDnetFile = inputDnetFile
+        self.getStartEndStructs()
+        
+    def getStartEndStructs(self):
+        '''
+        reads through the dnet file looking for parentheses
+        ie  '{' , '}' and records their locations. 
+        '''
+        starts = []
+        defaultstart = [None, None, None, None]
+        ends = []
+        structIndicies = []
+        lineNum = 0
+        fh = open(self.inputDnetFile, 'r')
+        for line in fh:
+            line = line.replace('\n', '')
+            colNum = 0
+            for char in line:
+                if char == '}':
+                    # found the end of a struct
+                    ends.append([lineNum, colNum])
+                    
+                elif char == '{':
+                    # found the start of a struct
+                    starts.append([lineNum, colNum])
+                    tmpLine = defaultstart
+                    structIndicies
+                colNum += 1
+            lineNum += 1
+        
+        print starts
+        print ends
+            
+        
         
     def buildRegularExpressions(self):
         # read through once finding the start and end 
@@ -166,15 +200,14 @@ class parseDNET(object):
             # step1 detect start of a multiline / tabular data struct!
             #       these tend to start with 'var = ' followed by 
             #       nothing!
-            
-            
-                
+      
             
 
             
             # list of lists, exeample:
             # path = ((111, 51), (168, 18), (42,....
             # end of a struct
+            return
             
     def readRestOfMultiLineStruct(self, line):
         '''
@@ -370,9 +403,262 @@ class parseDNET(object):
         print 'endKeys:', structEnds, len(structEnds)
         return structStarts, structEnds
         
+        
+class DNETStructParser():
+    '''
+    This class contains the methods necessary to parse out the 
+    start and stop points of netica's nested data structures.
+    '''
+    lineCnt = 1
+    defaultLine = [None, None, None, None, []]
+    struct = None
+
+    
+    def __init__(self, dnetFile):
+        self.dnetFile = dnetFile
+    
+    def parseStartEndPoints(self):
+        self.fh = open(self.dnetFile, 'r')
+        #lineCnt = 0
+        #prevStruct = None
+        #self.struct = self.defaultLine
+        self.struct = self.nextStruct(self.struct, None)
+        self.fh.close()
+        print self.struct
+        
+    def nextStruct(self, curStruct, prevStruct):
+        # initial scan
+        startEnd = []
+        lineNum = 0
+        for line in self.fh:
+            charNum = 0
+            for char in line:
+                if char == '{':
+                    startEnd.append(['START', lineNum, charNum])
+                elif char == '}':
+                    startEnd.append(['END', lineNum, charNum])
+                charNum += 1
+            lineNum += 1
+        print startEnd
+        # now going to restructure the startEnd points
+        self.restruct(startEnd)
+                    
+    def restruct(self, elemList):
+        struct = self.defaultLine
+        pointer = struct
+        curElemCnt = 0
+        startElemObj = elementObject()
+        curElemObj = startElemObj
+        
+        print 'elemList:', elemList
+        
+        while curElemCnt < len(elemList):
+            print 'curElemCnt', curElemCnt
+        
+            curElem = elemList[curElemCnt]
+            
+            if curElemCnt < len(elemList) - 1:
+                # if the next element is an ending and the current one is 
+                # a starter
+                nextElem = elemList[curElemCnt + 1]
+                if nextElem[0] == 'END' and curElem[0] == 'START':
+                    startLine = elemList[curElemCnt][1]
+                    startCol = elemList[curElemCnt][2]
+                    endLine = elemList[curElemCnt + 1][1]
+                    endCol = elemList[curElemCnt + 1][2]
+                    curElemObj.setStartAndEnd(startLine, startCol, endLine, endCol)
+                    curElemObj.printProperties()
+                    parentObj = curElemObj.getParent()
+                    # now add another child to the parent and set the 
+                    # curElemObj to that child
+                    curElemObj = parentObj.addChild()
+                    #curElemObj = parentObj
+                    curElemCnt += 2
+                    continue
+            if elemList[curElemCnt][0] == 'START':
+                # when we find a start, populat the current element
+                # then request a new child and set the child to be the
+                # curElem
+                print 'found start', elemList[curElemCnt]
+                curElemObj.setStart(elemList[curElemCnt][1], elemList[curElemCnt][2])
+                childObj = curElemObj.addChild()
+                curElemObj = childObj
+            elif elemList[curElemCnt][0] == 'END':
+                print 'found end', elemList[curElemCnt]
+                parentObj = curElemObj.getParent()
+                parentObj.setEnd(elemList[curElemCnt][1], elemList[curElemCnt][2])
+                parentObj.printProperties()
+                
+                #curElemObj = parentObj
+                
+                parentObj = parentObj.getParent()
+                if parentObj:
+                    childObj = parentObj.addChild()
+                    curElemObj = childObj
+                else:
+                    # if parent retrns none means the current object does not have a parent
+                    # which means we are at the end of the data structure
+                    childObj = None
+                    curElemObj = childObj
+            curElemCnt += 1
+        print '------------------------888------------------------------'
+        startElemObj.printData(startElemObj)
+    
+    def add(self, type, data):
+        
+        if not self.struct:
+            print 'starting'
+            self.struct = self.defaultLine
+            self.prevStruct = None
+            self.pointer = self.struct
+        #if not self.pointer:
+        #    self.pointer = self.defaultLine
+        if type == 'START':
+            print 'struct:',  self.struct
+            if not len(self.pointer):
+                self.pointer.append(data[0])
+                self.pointer.append(data[1])
+                self.pointer.append(None)
+                self.pointer.append(None)
+                self.pointer.append([])
+            else:
+                self.pointer[0] = data[0]
+                self.pointer[1] = data[1]
+            self.prevStruct = self.pointer
+            self.pointer = self.pointer[4]
+        if type == 'END':
+            self.pointer = self.prevStruct
+            self.pointer[2] = data[0]
+            self.pointer[3] = data[1]
+            
+            
+class DNETStruct():
+    
+    dnetStruct = []
+    rootElemObj = None
+    
+    def __init__(self):
+        # creates a default dnet structure
+        self.rootElemObj = elementObject()
+    
+    def addStart(self, startLine, startCol):
+        
+        self.pointer[0] = startLine
+        self.pointer[1] = startCol
+        self.prev = self.pointer
+        self.pointer = self.pointer[4]
+        self.pointer.append(self.defaultElems)
+        
+    def addEnd(self, endLine, endCol):
+        # populate on prev
+        self.pointer = self.prev
+        
+class elementObject():
+    
+#     startLine = None
+#     startCol = None
+#     endLine = None
+#     endCol = None
+#     
+#     parents = []
+#     children = []
+#     
+#     childPointer = None
+#     parentPointer = None
+    
+    def __init__(self):
+        # instantiate instance vars
+        self.startLine = None
+        self.startCol = None
+        self.endLine = None
+        self.endCol = None
+        
+        self.parents = []
+        self.children = []
+        
+        self.childPointer = None
+        self.parentPointer = None
+    
+    def setStart(self, line, col):
+        self.startLine = line
+        self.startCol = col
+        
+    def setEnd(self, line, col):
+        self.endLine = line
+        self.endCol = col
+        
+    def getChildren(self):
+        return self.children
+    
+    def getParents(self):
+        return self.parents
+    
+    def getParent(self):
+        self.parentPointer = len(self.parents) - 1
+        print self.parentPointer
+        if self.parentPointer > 0:
+            raise 'There are multiple parents, should only ever be one!'
+        elif self.parentPointer == 0:
+            retObj = self.parents[self.parentPointer]
+        else:
+            retObj = None
+        #self.parentPointer -= 1
+        return retObj
+    
+    def getChild(self):
+        retObj = self.children[self.childPointer]
+        self.childPointer -= 1
+        return retObj
+    
+    def addParent(self, parentObj):
+        # need to verify whether this parent already exists
+        self.parents.append(parentObj)
+        self.parentPointer = len(self.parents) - 1
+        
+    def addChild(self):
+        childObj = elementObject()
+        childObj.addParent(self)
+        self.children.append(childObj)
+        self.childPointer = len(self.children) - 1
+        return childObj
+        
+    def setPointerToChild(self):
+        childObj = elementObject()
+        self.addChild(childObj)
+        
+    def setStartAndEnd(self, startLine, startCol, endLine, endCol):
+        self.startLine = startLine
+        self.startCol = startCol
+        self.endLine = endLine
+        self.endCol = endCol
+        
+    def printProperties(self):
+        lbl = ['startline', 'startcol', 'endline', 'endcol']
+        vals = []
+        cnt = 0
+        print '----------------------------'
+        for num in [self.startLine, self.startCol, self.endLine, self.endCol]:
+            if num <> None:
+                vals.append(num + 1)
+            else:
+                vals.append('NONE')
+            print lbl[cnt], ' - ', vals[cnt]
+            cnt += 1        
+        return
+        
+    def printData(self, startObj):
+        startObj.printProperties()
+        for child in startObj.getChildren():
+            #child.printProperties()
+            child.printData(child)
+    
 if __name__ == '__main__':
     dnetFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\Car_Buyer.dnet.txt'
-    parser = parseDNET(dnetFile)
-    parser.parse()
+    dnetTestFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\testdata.txt'
+    startEndParse = DNETStructParser(dnetTestFile)
+    startEndParse.parseStartEndPoints()
+    
+    #parser = parseDNET(dnetFile)
+    #parser.parse()
     
     
