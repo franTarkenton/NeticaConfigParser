@@ -412,6 +412,9 @@ class DNETStructParser():
     lineCnt = 1
     defaultLine = [None, None, None, None, []]
     struct = None
+    
+    startChar = '{'
+    endChar = '}'
 
     
     def __init__(self, dnetFile):
@@ -419,28 +422,27 @@ class DNETStructParser():
     
     def parseStartEndPoints(self):
         self.fh = open(self.dnetFile, 'r')
-        #lineCnt = 0
-        #prevStruct = None
-        #self.struct = self.defaultLine
         self.struct = self.nextStruct(self.struct, None)
         self.fh.close()
         print self.struct
         
     def nextStruct(self, curStruct, prevStruct):
-        # initial scan
+        # initial scan which records where the startChar and 
+        # endChar's are found.
         startEnd = []
         lineNum = 0
         for line in self.fh:
             charNum = 0
             for char in line:
-                if char == '{':
+                if char == self.startChar:
                     startEnd.append(['START', lineNum, charNum])
-                elif char == '}':
+                elif char == self.endChar:
                     startEnd.append(['END', lineNum, charNum])
                 charNum += 1
             lineNum += 1
         print startEnd
-        # now going to restructure the startEnd points
+        # now that I know where the startChar and endChars are located
+        # the next step is to stuff them into a hierarchical data structure
         self.restruct(startEnd)
                     
     def restruct(self, elemList):
@@ -503,33 +505,8 @@ class DNETStructParser():
             curElemCnt += 1
         print '------------------------888------------------------------'
         startElemObj.printData(startElemObj)
+        return startElemObj
     
-    def add(self, type, data):
-        
-        if not self.struct:
-            print 'starting'
-            self.struct = self.defaultLine
-            self.prevStruct = None
-            self.pointer = self.struct
-        #if not self.pointer:
-        #    self.pointer = self.defaultLine
-        if type == 'START':
-            print 'struct:',  self.struct
-            if not len(self.pointer):
-                self.pointer.append(data[0])
-                self.pointer.append(data[1])
-                self.pointer.append(None)
-                self.pointer.append(None)
-                self.pointer.append([])
-            else:
-                self.pointer[0] = data[0]
-                self.pointer[1] = data[1]
-            self.prevStruct = self.pointer
-            self.pointer = self.pointer[4]
-        if type == 'END':
-            self.pointer = self.prevStruct
-            self.pointer[2] = data[0]
-            self.pointer[3] = data[1]
             
             
 class DNETStruct():
