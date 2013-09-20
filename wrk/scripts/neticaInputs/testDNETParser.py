@@ -9,6 +9,7 @@ tes
 '''
 import unittest
 import DNETParser
+import DNETParseLib
 from numpy.testing.utils import assert_equal
 from numpy.ma.testutils import assert_not_equal
 import re
@@ -396,8 +397,21 @@ class TestParser(unittest.TestCase):
             lineNum += 1
         
         
-        
-        
+    def test_Structiterator(self):
+        '''
+        No assertions just some code to evaluate whether the 
+        iterations are working correctly
+        '''
+        dnetFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\Car_Buyer.dnet.txt'
+        startEndParse = DNETParseLib.DNETStructParser(dnetFile)
+        startEndParse.parseStartEndPoints()
+        for obj in startEndParse.struct:
+            print '------------------------------'
+            print 'sl:', obj.startLine
+            print 'sc:', obj.startCol
+            print 'el:', obj.endLine
+            print 'ec', obj.endCol
+            #working
     # TODO: could try to convert the regular expressions to pull out
     #       structures from the file after it has been 
     #       loaded into memory!  Set up to parse multilines
@@ -418,7 +432,7 @@ if __name__ == "__main__":
     #testSuite.addTest(TestParser('testCommentRegExpr'))
     #testSuite.addTest(TestParser('testPropertyAssignment'))
     #testSuite.addTest(TestParser('testMultiline'))
-    testSuite.addTest(TestParser('testre_startMultiLineDataStruct'))
+    testSuite.addTest(TestParser('test_Structiterator'))
     unittest.TextTestRunner(verbosity=2).run(testSuite)
     
     

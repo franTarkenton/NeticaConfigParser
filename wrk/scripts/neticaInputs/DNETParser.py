@@ -415,18 +415,16 @@ class DNETStructParser():
     
     startChar = '{'
     endChar = '}'
-
     
     def __init__(self, dnetFile):
         self.dnetFile = dnetFile
     
     def parseStartEndPoints(self):
         self.fh = open(self.dnetFile, 'r')
-        self.struct = self.nextStruct(self.struct, None)
+        self.struct = self.__parseStructs(self.struct, None)
         self.fh.close()
-        print self.struct
         
-    def nextStruct(self, curStruct, prevStruct):
+    def __parseStructs(self, curStruct, prevStruct):
         # initial scan which records where the startChar and 
         # endChar's are found.
         startEnd = []
@@ -443,19 +441,18 @@ class DNETStructParser():
         print startEnd
         # now that I know where the startChar and endChars are located
         # the next step is to stuff them into a hierarchical data structure
-        hierarchDataStruct = self.restruct(startEnd)
+        hierarchDataStruct = self.__restruct(startEnd)
+        return hierarchDataStruct
                     
-    def restruct(self, elemList):
+    def __restruct(self, elemList):
         struct = self.defaultLine
         pointer = struct
         curElemCnt = 0
         startElemObj = elementObject()
         curElemObj = startElemObj
         
-        print 'elemList:', elemList
         
         while curElemCnt < len(elemList):
-            print 'curElemCnt', curElemCnt
         
             curElem = elemList[curElemCnt]
             
@@ -481,12 +478,10 @@ class DNETStructParser():
                 # when we find a start, populat the current element
                 # then request a new child and set the child to be the
                 # curElem
-                print 'found start', elemList[curElemCnt]
                 curElemObj.setStart(elemList[curElemCnt][1], elemList[curElemCnt][2])
                 childObj = curElemObj.addChild()
                 curElemObj = childObj
             elif elemList[curElemCnt][0] == 'END':
-                print 'found end', elemList[curElemCnt]
                 parentObj = curElemObj.getParent()
                 parentObj.setEnd(elemList[curElemCnt][1], elemList[curElemCnt][2])
                 parentObj.printProperties()
@@ -503,30 +498,10 @@ class DNETStructParser():
                     childObj = None
                     curElemObj = childObj
             curElemCnt += 1
-        print '------------------------888------------------------------'
-        startElemObj.printData(startElemObj)
-        return startElemObj
             
-class DNETStruct():
-    
-    dnetStruct = []
-    rootElemObj = None
-    
-    def __init__(self):
-        # creates a default dnet structure
-        self.rootElemObj = elementObject()
-    
-    def addStart(self, startLine, startCol):
-        
-        self.pointer[0] = startLine
-        self.pointer[1] = startCol
-        self.prev = self.pointer
-        self.pointer = self.pointer[4]
-        self.pointer.append(self.defaultElems)
-        
-    def addEnd(self, endLine, endCol):
-        # populate on prev
-        self.pointer = self.prev
+        #print '------------------------888------------------------------'
+        #startElemObj.printData(startElemObj)
+        return startElemObj
         
 class elementObject():
     '''
@@ -557,6 +532,8 @@ class elementObject():
     :ivar startLine: The start line of the current data structure.
     '''
     
+    # TODO: add an iterable interface! Add some tests
+    # TODO: add a printable interface!
     
     def __init__(self):
         '''
@@ -573,6 +550,82 @@ class elementObject():
         
         self.childPointer = None
         self.parentPointer = None
+        
+        # these properties are used for 
+        # iteration.
+        self.curIterCnt = 0
+        self.maxIter = None
+        self.iterStarted = False
+        self.ObjList = []
+        
+    def __iter__(self):
+        return self
+    
+    def spiderStruct(self, obj=None):
+        '''
+        iterates starting with a root, going through every
+        child there is and stuffing them all into a list
+        '''
+        if obj==None:
+            obj = self
+        self.ObjList.append(obj)
+        children = obj.getChildren()
+        for child in children:
+            self.spiderStruct(child)
+    
+    def next(self):
+        '''
+        An iteration inteface that will return an 
+        elementObject, starting with the current
+        object then spidering through the children 
+        of this object.
+        '''
+        retVal = None
+        if not self.iterStarted:
+            self.iterStarted = True
+            self.spiderStruct(self)
+            self.curIterCnt = 0
+            self.maxIter = len(self.ObjList)
+        
+        if  self.curIterCnt < self.maxIter:
+            retVal = self.ObjList[self.curIterCnt]
+            self.curIterCnt += 1
+            if self.ObjectIsNull(retVal):
+                retVal = self.next()
+        else:
+            # reset the parameters used for iteration so 
+            # we can iterate anther time
+            self.iterStarted = False
+            self.curIterCnt = 0
+            self.ObjList = []
+            self.maxIter = None
+            raise StopIteration
+        
+        return retVal
+    
+    def ObjectIsNull(self, obj):
+        '''
+        parsing of the data structure can result in children of 
+        some objects being made up of entirely null values, or in 
+        other words a null object that should not be there. This 
+        method will test for those types of objects.  Returns true if 
+        the object provided as an arg is null, and false if the object
+        provided as an arg is true.
+        
+        :param  obj: The input object that is to be tested
+        :type obj: elementObject
+        
+        :returns: boolean value indicating if the supplied object is null.
+        :rtype: boolean
+        '''
+        if obj.startLine == None and \
+           obj.startCol == None and \
+           obj.endCol == None and \
+           obj.endLine == None:
+            retVal = True
+        else:
+            retVal = False
+        return retVal
     
     def setStart(self, line, col):
         '''
