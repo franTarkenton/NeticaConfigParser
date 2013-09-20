@@ -12,6 +12,8 @@ class DNETDataParser():
         self.dnetFile = dnetFile
         parseObj = DNETStructParser(dnetFile)
         self.struct = parseObj.getElementTreeRootElement()
+        print 'struct is:'
+        print self.struct
         fh = open(dnetFile, 'r')
         self.dnetMem = fh.readlines()
         fh.close()

@@ -1,0 +1,349 @@
+// ~->[DNET-1]->~
+
+// File created by WilsonS at EcoLogic using Netica 3.24 on May 17, 2013 at 10:45:55.
+
+bnet Mule_deer_model_6 {
+AutoCompile = TRUE;
+autoupdate = TRUE;
+whenchanged = 1368579663;
+
+visual V1 {
+	defdispform = BELIEFBARS;
+	nodelabeling = TITLE;
+	NodeMaxNumEntries = 50;
+	nodefont = font {shape= "Arial"; size= 10;};
+	linkfont = font {shape= "Arial"; size= 9;};
+	windowposn = (86, 58, 902, 674);
+	scrollposn = (230, 43);
+	resolution = 72;
+	drawingbounds = (16062, 8908);
+	showpagebreaks = FALSE;
+	usegrid = TRUE;
+	gridspace = (6, 6);
+	NodeSet Node {BuiltIn = 1; Color = 0xc0c0c0;};
+	NodeSet Nature {BuiltIn = 1; Color = 0xf8eed2;};
+	NodeSet Deterministic {BuiltIn = 1; Color = 0xd3caa6;};
+	NodeSet Finding {BuiltIn = 1; Color = 0xc8c8c8;};
+	NodeSet Constant {BuiltIn = 1; Color = 0xffffff;};
+	NodeSet ConstantValue {BuiltIn = 1; Color = 0xffffb4;};
+	NodeSet Utility {BuiltIn = 1; Color = 0xffbdbd;};
+	NodeSet Decision {BuiltIn = 1; Color = 0xdee8ff;};
+	NodeSet Documentation {BuiltIn = 1; Color = 0xf0fafa;};
+	NodeSet Title {BuiltIn = 1; Color = 0xffffff;};
+	PrinterSetting A {
+		margins = (1270, 1270, 1270, 1270);
+		landscape = FALSE;
+		magnify = 1;
+		};
+	};
+
+node Habitat_risk {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("None", "Low", "Moderate-low", "Moderate-high", "High");
+	levels = (0, 1, 2, 3, 4);
+	parents = ();
+	probs = 
+		// None         Low          Moderate-low Moderate-high High        
+		  (0.2,         0.2,         0.2,         0.2,         0.2);
+	EqnDirty = TRUE;
+	title = "UWR Hazard Rating";
+	comment = "Maps to snow interception categories.";
+	whenchanged = 1368579538;
+	belief = (0.2, 0.2, 0.2, 0.2, 0.2);
+	visual V1 {
+		center = (672, 504);
+		height = 4;
+		};
+	};
+
+node P {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("0%", "0-10%", "10-20%", "20-100%");
+	levels = (0, 0.25, 0.5, 1);
+	parents = ();
+	probs = 
+		// 0%           0-10%        10-20%       20-100%      
+		  (0.25,        0.25,        0.25,        0.25);
+	title = "Proportion of LU in UWR";
+	whenchanged = 1368579538;
+	belief = (0.25, 0.25, 0.25, 0.25);
+	visual V1 {
+		center = (456, 498);
+		height = 5;
+		};
+	};
+
+node LU_hazard {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("None", "Low", "Moderate-low", "Moderate-high", "High");
+	levels = (0, 1, 2, 3, 4);
+	parents = (Habitat_risk, P);
+	probs = 
+		// None         Low          Moderate-low Moderate-high High           // Habitat_risk  P       
+		(((1,           0,           0,           0,           0),             // None          0%      
+		  (1,           0,           0,           0,           0),             // None          0-10%   
+		  (1,           0,           0,           0,           0),             // None          10-20%  
+		  (1,           0,           0,           0,           0)),            // None          20-100% 
+		 ((1,           0,           0,           0,           0),             // Low           0%      
+		  (0.75,        0.25,        0,           0,           0),             // Low           0-10%   
+		  (0.5,         0.5,         0,           0,           0),             // Low           10-20%  
+		  (0,           1,           0,           0,           0)),            // Low           20-100% 
+		 ((1,           0,           0,           0,           0),             // Moderate-low  0%      
+		  (0,           0.75,        0.25,        0,           0),             // Moderate-low  0-10%   
+		  (0,           0.5,         0.5,         0,           0),             // Moderate-low  10-20%  
+		  (0,           0,           1,           0,           0)),            // Moderate-low  20-100% 
+		 ((1,           0,           0,           0,           0),             // Moderate-high 0%      
+		  (0,           0,           0.75,        0.25,        0),             // Moderate-high 0-10%   
+		  (0,           0,           0.5,         0.5,         0),             // Moderate-high 10-20%  
+		  (0,           0,           0,           1,           0)),            // Moderate-high 20-100% 
+		 ((1,           0,           0,           0,           0),             // High          0%      
+		  (0,           0,           0,           0.75,        0.25),          // High          0-10%   
+		  (0,           0,           0,           0.5,         0.5),           // High          10-20%  
+		  (0,           0,           0,           0,           1)));           // High          20-100% ;
+	title = "Habitat Hazard Rating";
+	whenchanged = 1358743038;
+	belief = (0.4625, 0.15, 0.15, 0.15, 0.0875);
+	visual V1 {
+		center = (672, 342);
+		height = 3;
+		link 2 {
+			path = ((530, 445), (590, 403));
+			};
+		};
+	};
+
+node Density_roads {
+	kind = NATURE;
+	discrete = FALSE;
+	chance = CHANCE;
+	statetitles = ("<1 km/km2", "1-2 km/km2", "2-3 km/km2");
+	levels = (0, 1, 2, 3);
+	parents = ();
+	probs = 
+		// <1 km/km2    1-2 km/km2   2-3 km/km2   
+		  (0.3333333,   0.3333333,   0.3333333);
+	EqnDirty = TRUE;
+	title = "Road Density";
+	whenchanged = 1368579538;
+	belief = (0.3333333, 0.3333333, 0.3333333);
+	visual V1 {
+		center = (1104, 666);
+		height = 10;
+		};
+	};
+
+node Hunting_unregulated {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("Low", "Moderate", "High");
+	parents = (Density_roads);
+	probs = 
+		// Low          Moderate     High           // Density_roads 
+		 ((0.75,        0.25,        0),            // <1 km/km2     
+		  (0.25,        0.75,        0),            // 1-2 km/km2    
+		  (0.25,        0.5,         0.25));        // 2-3 km/km2    ;
+	EqnDirty = TRUE;
+	title = "Unregulated Hunting Rate";
+	whenchanged = 1367606253;
+	belief = (0.4166667, 0.5, 0.08333333);
+	visual V1 {
+		center = (1104, 480);
+		height = 7;
+		};
+	};
+
+node Cougar_risk {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("High", "Moderate", "Low");
+	parents = ();
+	probs = 
+		// High         Moderate     Low          
+		  (0.3333333,   0.3333333,   0.3333333);
+	title = "Cougar Risk Level";
+	whenchanged = 1368579538;
+	belief = (0.3333333, 0.3333333, 0.3333333);
+	visual V1 {
+		center = (690, 654);
+		height = 9;
+		};
+	};
+
+node B {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("Present", "Not present");
+	parents = ();
+	probs = 
+		// Present      Not present  
+		  (0.5,         0.5);
+	title = "Wolf Presence";
+	whenchanged = 1368579538;
+	belief = (0.5, 0.5);
+	visual V1 {
+		center = (888, 648);
+		height = 8;
+		};
+	};
+
+node Predation {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("Low", "Moderate", "High");
+	parents = (Density_roads, Cougar_risk, B);
+	probs = 
+		//  Low          Moderate     High             // Density_roads Cougar_risk B           
+		((((0.75,        0.25,        0),              // <1 km/km2     High        Present     
+		   (1,           0,           0)),             // <1 km/km2     High        Not present 
+		  ((0.25,        0.75,        0),              // <1 km/km2     Moderate    Present     
+		   (0.5,         0.5,         0)),             // <1 km/km2     Moderate    Not present 
+		  ((0,           0.5,         0.5),            // <1 km/km2     Low         Present     
+		   (0.25,        0.75,        0))),            // <1 km/km2     Low         Not present 
+		 (((0.5,         0.5,         0),              // 1-2 km/km2    High        Present     
+		   (1,           0,           0)),             // 1-2 km/km2    High        Not present 
+		  ((0,           1,           0),              // 1-2 km/km2    Moderate    Present     
+		   (0.5,         0.5,         0)),             // 1-2 km/km2    Moderate    Not present 
+		  ((0,           0.25,        0.75),           // 1-2 km/km2    Low         Present     
+		   (0.25,        0.75,        0))),            // 1-2 km/km2    Low         Not present 
+		 (((0.25,        0.75,        0),              // 2-3 km/km2    High        Present     
+		   (1,           0,           0)),             // 2-3 km/km2    High        Not present 
+		  ((0,           0.75,        0.25),           // 2-3 km/km2    Moderate    Present     
+		   (0.5,         0.5,         0)),             // 2-3 km/km2    Moderate    Not present 
+		  ((0,           0,           1),              // 2-3 km/km2    Low         Present     
+		   (0.25,        0.75,        0))));           // 2-3 km/km2    Low         Not present ;
+	EqnDirty = TRUE;
+	title = "Predation Rate";
+	whenchanged = 1368572750;
+	belief = (0.3888889, 0.4722222, 0.1388889);
+	visual V1 {
+		center = (888, 480);
+		height = 6;
+		};
+	};
+
+node Regulated {
+	kind = NATURE;
+	discrete = TRUE;
+	statetitles = ("None", "GOS", "Antlerless");
+	parents = ();
+	title = "Regulated Hunting Rate";
+	whenchanged = 1368579538;
+	belief = (0.3333334, 0.3333333, 0.3333333);
+	visual V1 {
+		center = (1326, 480);
+		height = 11;
+		};
+	};
+
+node Population_risk {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = CHANCE;
+	statetitles = ("None", "Low", "Moderate-low", "Moderate-high", "High");
+	levels = (1, 1, 2, 3, 4);
+	parents = (Hunting_unregulated, Predation, Regulated);
+	probs = 
+		//  None         Low          Moderate-low Moderate-high High            // Hunting_unregulated Predation Regulated  
+		((((0,           1,           0,           0,           0),              // Low                 Low       None       
+		   (0,           1,           0,           0,           0),              // Low                 Low       GOS        
+		   (0,           0.75,        0.25,        0,           0)),             // Low                 Low       Antlerless 
+		  ((0,           0.85,        0.15,        0,           0),              // Low                 Moderate  None       
+		   (0,           0.75,        0.25,        0,           0),              // Low                 Moderate  GOS        
+		   (0,           0.5,         0.25,        0.25,        0)),             // Low                 Moderate  Antlerless 
+		  ((0,           0.6,         0.25,        0.15,        0),              // Low                 High      None       
+		   (0,           0.5,         0.25,        0.25,        0),              // Low                 High      GOS        
+		   (0,           0.25,        0.5,         0.25,        0))),            // Low                 High      Antlerless 
+		 (((0,           0.35,        0.5,         0.15,        0),              // Moderate            Low       None       
+		   (0,           0.25,        0.5,         0.25,        0),              // Moderate            Low       GOS        
+		   (0,           0,           0.5,         0.5,         0)),             // Moderate            Low       Antlerless 
+		  ((0,           0,           0.6,         0.4,         0),              // Moderate            Moderate  None       
+		   (0,           0,           0.5,         0.5,         0),              // Moderate            Moderate  GOS        
+		   (0,           0,           0.5,         0.25,        0.25)),          // Moderate            Moderate  Antlerless 
+		  ((0,           0,           0.6,         0.25,        0.15),           // Moderate            High      None       
+		   (0,           0,           0.5,         0.25,        0.25),           // Moderate            High      GOS        
+		   (0,           0,           0.25,        0.5,         0.25))),         // Moderate            High      Antlerless 
+		 (((0,           0,           0.35,        0.5,         0.15),           // High                Low       None       
+		   (0,           0,           0.25,        0.5,         0.25),           // High                Low       GOS        
+		   (0,           0,           0,           0.5,         0.5)),           // High                Low       Antlerless 
+		  ((0,           0,           0,           0.6,         0.4),            // High                Moderate  None       
+		   (0,           0,           0,           0.5,         0.5),            // High                Moderate  GOS        
+		   (0,           0,           0,           0.25,        0.75)),          // High                Moderate  Antlerless 
+		  ((0,           0,           0,           0.35,        0.65),           // High                High      None       
+		   (0,           0,           0,           0.25,        0.75),           // High                High      GOS        
+		   (0,           0,           0,           0,           1))));           // High                High      Antlerless ;
+	numcases = 1;
+	EqnDirty = TRUE;
+	title = "Population Hazard Rating";
+	whenchanged = 1368579663;
+	belief = (0, 0.3546296, 0.3326968, 0.2336805, 0.07899305);
+	visual V1 {
+		center = (1014, 342);
+		height = 2;
+		link 2 {
+			path = ((919, 445), (959, 403));
+			};
+		};
+	};
+
+node Risk {
+	kind = NATURE;
+	discrete = TRUE;
+	chance = DETERMIN;
+	statetitles = ("None", "Low", "Moderate-low", "Moderate-high", "High");
+	levels = (0, 1, 2, 3, 4);
+	parents = (LU_hazard, Population_risk);
+	functable = 
+		                     // LU_hazard     Population_risk 
+		 ((#0,               // None          None            
+		   #1,               // None          Low             
+		   #2,               // None          Moderate-low    
+		   #3,               // None          Moderate-high   
+		   #4),              // None          High            
+		  (#1,               // Low           None            
+		   #1,               // Low           Low             
+		   #2,               // Low           Moderate-low    
+		   #3,               // Low           Moderate-high   
+		   #4),              // Low           High            
+		  (#2,               // Moderate-low  None            
+		   #2,               // Moderate-low  Low             
+		   #2,               // Moderate-low  Moderate-low    
+		   #3,               // Moderate-low  Moderate-high   
+		   #4),              // Moderate-low  High            
+		  (#3,               // Moderate-high None            
+		   #3,               // Moderate-high Low             
+		   #3,               // Moderate-high Moderate-low    
+		   #3,               // Moderate-high Moderate-high   
+		   #4),              // Moderate-high High            
+		  (#4,               // High          None            
+		   #4,               // High          Low             
+		   #4,               // High          Moderate-low    
+		   #4,               // High          Moderate-high   
+		   #4));             // High          High            ;
+	EqnDirty = TRUE;
+	title = "Mule Deer Hazard Rating";
+	comment = "The highest of either habitat or population risk";
+	whenchanged = 1358743044;
+	belief = (0, 0.2172107, 0.3068757, 0.3163325, 0.1595812);
+	visual V1 {
+		center = (840, 204);
+		height = 1;
+		link 1 {
+			path = ((746, 282), (768, 265));
+			};
+		link 2 {
+			path = ((937, 282), (914, 265));
+			};
+		};
+	};
+ElimOrder = (Cougar_risk, B, Density_roads, Hunting_unregulated, Predation, Regulated, Habitat_risk, P, LU_hazard, Population_risk, Risk);
+};
