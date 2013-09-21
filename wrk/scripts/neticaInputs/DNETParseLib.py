@@ -1,22 +1,51 @@
 
 import linecache
+import re
+import sys
 
 
 class DNETDataParser():
+    
+    # the path to the dnetFile that is being parsed
+    dnetFile = None
+    # The dnetFile above only this variable contains the contents
+    # of that file in memory
+    dnetMem = None
+    # hierarchical data structure containing the start and stop 
+    # points for the dnet file. 
+    struct = None
+    
+    # The current element that is being processed
+    curElem = None
+    # The parent element of the current element
+    prevElem = None
     
     def __init__(self, dnetFile):
         '''
         Input element is a root level elementObj with the 
         structure of the dnet file contained in it
         '''
+        # setting the current file
         self.dnetFile = dnetFile
+        # creating a parse object on the current file. The parse object is used to determine
+        # the start and end points of the various data structures in the file. (only gets us
+        # halfway there)
         parseObj = DNETStructParser(dnetFile)
+        # self.struct = contains each element from the dnet file.  Its a 
+        # hierarchical data struct which contains parents.  Has an iterable 
+        # interface.
         self.struct = parseObj.getElementTreeRootElement()
-        print 'struct is:'
-        print self.struct
+        # useful for debugging but should be commented out once go to production
+        self.struct.printData(self.struct)
+        # read the contents of the dnetfile to memory, and then close the 
+        # file handle
         fh = open(dnetFile, 'r')
         self.dnetMem = fh.readlines()
         fh.close()
+        
+        # setting up some blank data structs.
+        self.curElem = None
+        self.prevElem = None
     
     def parse(self):
         '''
@@ -44,12 +73,55 @@ class DNETDataParser():
             measure - not used in mule deer, can code later.
             
         '''
-        rootStart = self.struct.startLine
+        print '**************************************************'
+        # Have the start and end points of each data struct.  The 
+        # self.struct is iterable and feeds the data in order.
+        # going to iterate through 
+        pastFirstElement = False
+        for i in self.struct:
+            # The first element in self.struct wraps all the other elements
+            # skipping over this one.
+            if not pastFirstElement:
+                pastFirstElement = True
+            else:
+                # parse the node:
+                nodeObj = self.__parseNode(i)
+                # is this the first element to be read?
+#                 if not self.prevElem and not self.curElem:
+#                     self.prevElem = 
+            print 'i:', i.printProperties()
+            
+    def __parseNode(self, elemObj):
+        firstLine = self.dnetMem[elemObj.startLine]
+        firstLineList = re.split('\s+', firstLine)
+        type = firstLineList[0]
+        name = firstLineList[1]
+        nodeObj = DNETNode(type, name)
+        print 'Children are:'
+        for i in elemObj.getChildren():
+            i.printProperties()
+        sys.exit()
         
-        print 'line:', self.dnetMem[rootStart]
         
+        curLineNum = firstLine + 1
+        while curLineNum <= elemObj.endLine:
+            curLine = self.dnetMem[curLineNum]
+            list = re.split('\s*=\s*', )
+            
+            curLineNum += 1
+        sys.exit()
         
 
+class DNETNode(): 
+    type = ''
+    name = ''
+    values = []
+    
+    def __init__(self, type, name, values=[]):
+        self.type = type
+        self.name = name
+        if values:
+            self.values = values
 
 class DNETStructParser():
     '''
@@ -102,12 +174,8 @@ class DNETStructParser():
         curElemCnt = 0
         startElemObj = elementObject()
         curElemObj = startElemObj
-        
-        
         while curElemCnt < len(elemList):
-        
             curElem = elemList[curElemCnt]
-            
             if curElemCnt < len(elemList) - 1:
                 # if the next element is an ending and the current one is 
                 # a starter
@@ -120,9 +188,10 @@ class DNETStructParser():
                     curElemObj.setStartAndEnd(startLine, startCol, endLine, endCol)
                     curElemObj.printProperties()
                     parentObj = curElemObj.getParent()
-                    # now add another child to the parent and set the 
-                    # curElemObj to that child
-                    curElemObj = parentObj.addChild()
+                    if parentObj:
+                        # now add another child to the parent and set the 
+                        # curElemObj to that child
+                        curElemObj = parentObj.addChild()
                     #curElemObj = parentObj
                     curElemCnt += 2
                     continue
@@ -135,11 +204,10 @@ class DNETStructParser():
                 curElemObj = childObj
             elif elemList[curElemCnt][0] == 'END':
                 parentObj = curElemObj.getParent()
-                parentObj.setEnd(elemList[curElemCnt][1], elemList[curElemCnt][2])
+                if parentObj:
+                    parentObj.setEnd(elemList[curElemCnt][1], elemList[curElemCnt][2])
                 parentObj.printProperties()
-                
                 #curElemObj = parentObj
-                
                 parentObj = parentObj.getParent()
                 if parentObj:
                     childObj = parentObj.addChild()
@@ -363,7 +431,9 @@ class elementObject():
         :type parentObj: elementObjects
         '''
         # need to verify whether this parent already exists
-        self.parents.append(parentObj)
+        if self.startLine <> parentObj.startLine and \
+           self.endLine <> parentObj.endLine:
+            self.parents.append(parentObj)
         self.parentPointer = len(self.parents) - 1
         
     def addChild(self):
@@ -376,7 +446,9 @@ class elementObject():
         '''
         childObj = elementObject()
         childObj.addParent(self)
-        self.children.append(childObj)
+        if childObj.startLine <> self.startLine and \
+           childObj.endLine <> self.endLine:
+            self.children.append(childObj)
         self.childPointer = len(self.children) - 1
         return childObj
                 
