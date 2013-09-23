@@ -206,9 +206,9 @@ class DNETStructParser():
                 parentObj = curElemObj.getParent()
                 if parentObj:
                     parentObj.setEnd(elemList[curElemCnt][1], elemList[curElemCnt][2])
-                parentObj.printProperties()
-                #curElemObj = parentObj
-                parentObj = parentObj.getParent()
+                    parentObj.printProperties()
+                    #curElemObj = parentObj
+                    parentObj = parentObj.getParent()
                 if parentObj:
                     childObj = parentObj.addChild()
                     curElemObj = childObj

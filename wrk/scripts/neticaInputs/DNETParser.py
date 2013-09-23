@@ -451,7 +451,6 @@ class DNETStructParser():
         startElemObj = elementObject()
         curElemObj = startElemObj
         
-        
         while curElemCnt < len(elemList):
         
             curElem = elemList[curElemCnt]
