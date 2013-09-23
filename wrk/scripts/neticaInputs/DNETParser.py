@@ -87,8 +87,6 @@ class parseDNET(object):
         print starts
         print ends
             
-        
-        
     def buildRegularExpressions(self):
         # read through once finding the start and end 
         # of structures, 
@@ -283,7 +281,6 @@ class parseDNET(object):
         # conversion to the list.
         return varName, valList
         
-            
     def singleLineStringParser(self, line):
         '''
         receives a line from a dnet file that contains a single 
@@ -412,6 +409,7 @@ class DNETStructParser():
     lineCnt = 1
     defaultLine = [None, None, None, None, []]
     struct = None
+    hierarchDataStruct = None
     
     startChar = '{'
     endChar = '}'
@@ -438,7 +436,7 @@ class DNETStructParser():
                     startEnd.append(['END', lineNum, charNum])
                 charNum += 1
             lineNum += 1
-        print startEnd
+        #print startEnd
         # now that I know where the startChar and endChars are located
         # the next step is to stuff them into a hierarchical data structure
         hierarchDataStruct = self.__restruct(startEnd)
@@ -448,9 +446,8 @@ class DNETStructParser():
         struct = self.defaultLine
         pointer = struct
         curElemCnt = 0
-        startElemObj = elementObject()
+        startElemObj = element()
         curElemObj = startElemObj
-        
         
         while curElemCnt < len(elemList):
         
@@ -466,7 +463,7 @@ class DNETStructParser():
                     endLine = elemList[curElemCnt + 1][1]
                     endCol = elemList[curElemCnt + 1][2]
                     curElemObj.setStartAndEnd(startLine, startCol, endLine, endCol)
-                    curElemObj.printProperties()
+                    #curElemObj.printProperties()
                     parentObj = curElemObj.getParent()
                     # now add another child to the parent and set the 
                     # curElemObj to that child
@@ -484,10 +481,8 @@ class DNETStructParser():
             elif elemList[curElemCnt][0] == 'END':
                 parentObj = curElemObj.getParent()
                 parentObj.setEnd(elemList[curElemCnt][1], elemList[curElemCnt][2])
-                parentObj.printProperties()
-                
+                #parentObj.printProperties()
                 #curElemObj = parentObj
-                
                 parentObj = parentObj.getParent()
                 if parentObj:
                     childObj = parentObj.addChild()
@@ -502,8 +497,64 @@ class DNETStructParser():
         #print '------------------------888------------------------------'
         #startElemObj.printData(startElemObj)
         return startElemObj
+     
+    def getNodeStartendLines(self):
+        # returns an element object.  Element objects are a hierarchical 
+        # data structure that describes the start and end points of nodes
+        # or verticies within the dnet file
+        if not self.struct:
+            self.parseStartEndPoints()
+        return self.struct
+    
+    def populateBayesParams(self):
+        '''
+        This method will take the values out of the actual file 
+        put them into a bayesElement object and then attach that 
+        object to the element object that describes there position
+        in the file
+        '''
+        print '-------------------- Populating Bayes Params --------------------'
+        # assume the first element in the structure is the bayes network values.
+        for elem in self.struct:
+            elem.printProperties()
+        sys.exit()
+
+class ParseBayesNet():
+    '''
+    This class will extract the information contained in the dnet file
+    and place it into a BayesData object.  The BayesData object is 
+    designed to make it easy to extract the information for use with 
+    other bayesian libraries.
+    '''
+    # This is the parser which will populate a BayesData object below
+    def __init__(self):
+        pass
+    
+class BayesData():
+    
+    def __init__(self ):
+        self.name = None
+        self.type = None  # Node, Vertex, network, edge
+        self.states = []
+        self.discrete = None # True or False
         
-class elementObject():
+        # nature, decision, utility, constant
+        # 
+        self.kind = None
+        
+        # chance - deterministic probableistic
+        # deterministic - no randomness involved in determining future state
+        # probablistic - likelyhood of something happening.
+        self.chance = None
+        self.parents = []
+        
+        self.probabilityTable = []
+        
+    #def setVar(self, name, value):
+        
+    
+        
+class element():
     '''
     This class is used to store hierarchical data structures
     that are found in the netica .dnet files.  These files contain
@@ -551,6 +602,10 @@ class elementObject():
         self.childPointer = None
         self.parentPointer = None
         
+        # will eventually contain a reference to a bayesElement object that
+        # contains additional attributes about the node's structure.
+        self.bayesAttribs = None
+             
         # these properties are used for 
         # iteration.
         self.curIterCnt = 0
@@ -576,7 +631,7 @@ class elementObject():
     def next(self):
         '''
         An iteration inteface that will return an 
-        elementObject, starting with the current
+        element, starting with the current
         object then spidering through the children 
         of this object.
         '''
@@ -613,7 +668,7 @@ class elementObject():
         provided as an arg is true.
         
         :param  obj: The input object that is to be tested
-        :type obj: elementObject
+        :type obj: element
         
         :returns: boolean value indicating if the supplied object is null.
         :rtype: boolean
@@ -659,7 +714,7 @@ class elementObject():
         
     def getChildren(self):
         '''
-        Returns a list of elementObject's that are children
+        Returns a list of element's that are children
         of the current object.
        
         :returns: a list of elementObjects that are children of the 
@@ -677,7 +732,7 @@ class elementObject():
         :rtype: elementObjects
         '''
         self.parentPointer = len(self.parents) - 1
-        print self.parentPointer
+        #print self.parentPointer
         if self.parentPointer > 0:
             raise 'There are multiple parents, should only ever be one!'
         elif self.parentPointer == 0:
@@ -689,7 +744,7 @@ class elementObject():
     
     def getChild(self):
         '''
-        Returns the current child of this elementObject.
+        Returns the current child of this element.
        
         :returns: an elementObjects that is the child of the current
                   object.
@@ -701,7 +756,7 @@ class elementObject():
     
     def addParent(self, parentObj):
         '''
-        Receives an elementObject that is the parent of the 
+        Receives an element that is the parent of the 
         current object and stores this in a property of the current
         object
         
@@ -715,13 +770,13 @@ class elementObject():
         
     def addChild(self):
         '''
-        Adds a child elementObject to the current object and returns the
-        child elementObject that was just created.        
+        Adds a child element to the current object and returns the
+        child element that was just created.        
         
         :returns: an element object that is a child of the current object
-        :rtype: elementObject
+        :rtype: element
         '''
-        childObj = elementObject()
+        childObj = element()
         childObj.addParent(self)
         self.children.append(childObj)
         self.childPointer = len(self.children) - 1
@@ -730,7 +785,7 @@ class elementObject():
     def setStartAndEnd(self, startLine, startCol, endLine, endCol):
         '''
         This method sets the start line, start column, end line and end
-        column for the current elementObject.
+        column for the current element.
                 
         :param  startLine: the line the structure that is being described 
                            starts on.
@@ -775,18 +830,23 @@ class elementObject():
         the current object as well as any child objects
         
         :param  startObj: the object that is to be printed
-        :type startObj: elementObject
+        :type startObj: element
         '''
         startObj.printProperties()
         for child in startObj.getChildren():
             #child.printProperties()
             child.printData(child)
     
+
+
+    
+    
 if __name__ == '__main__':
     dnetFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\Car_Buyer.dnet.txt'
     dnetTestFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\testdata.txt'
-    startEndParse = DNETStructParser(dnetTestFile)
+    startEndParse = DNETStructParser(dnetFile)
     startEndParse.parseStartEndPoints()
+    startEndParse.populateBayesParams()
     
     #parser = parseDNET(dnetFile)
     #parser.parse()

@@ -35,11 +35,38 @@ def playTypes():
         
     var = 'test'
     print type(var)
+    
+    
+class startClass():
+    def __init__(self):
+        self.var = 1
         
+    
+class nextClass(startClass):
+    def __init__(self, obj2Extend=None):
+        if not obj2Extend:
+            print 'new class'
+            startClass.__init__(self)
+        else:
+            # slurping all the properties from previous object and making them part 
+            # of this object.
+            for property, value in vars(obj2Extend).iteritems():
+                setattr(self, property, value)
+
+
+       
         
 if __name__ == '__main__':
     #playregex()
-    playTypes()
+    #playTypes()
+    obj = startClass()
+    obj.var = 3
+    obj2 = nextClass(obj)
+    print obj2.var
+    obj3 = nextClass()
+    print obj3.var
+    
+    
     
     
     

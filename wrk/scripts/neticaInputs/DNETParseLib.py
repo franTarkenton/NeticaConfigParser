@@ -100,7 +100,7 @@ class DNETStructParser():
         struct = self.defaultLine
         pointer = struct
         curElemCnt = 0
-        startElemObj = elementObject()
+        startElemObj = element()
         curElemObj = startElemObj
         
         
@@ -155,7 +155,7 @@ class DNETStructParser():
         #startElemObj.printData(startElemObj)
         return startElemObj
         
-class elementObject():
+class element():
     '''
     This class is used to store hierarchical data structures
     that are found in the netica .dnet files.  These files contain
@@ -230,7 +230,7 @@ class elementObject():
     def next(self):
         '''
         An iteration inteface that will return an 
-        elementObject, starting with the current
+        element, starting with the current
         object then spidering through the children 
         of this object.
         '''
@@ -267,7 +267,7 @@ class elementObject():
         provided as an arg is true.
         
         :param  obj: The input object that is to be tested
-        :type obj: elementObject
+        :type obj: element
         
         :returns: boolean value indicating if the supplied object is null.
         :rtype: boolean
@@ -313,7 +313,7 @@ class elementObject():
         
     def getChildren(self):
         '''
-        Returns a list of elementObject's that are children
+        Returns a list of element's that are children
         of the current object.
        
         :returns: a list of elementObjects that are children of the 
@@ -343,7 +343,7 @@ class elementObject():
     
     def getChild(self):
         '''
-        Returns the current child of this elementObject.
+        Returns the current child of this element.
        
         :returns: an elementObjects that is the child of the current
                   object.
@@ -355,7 +355,7 @@ class elementObject():
     
     def addParent(self, parentObj):
         '''
-        Receives an elementObject that is the parent of the 
+        Receives an element that is the parent of the 
         current object and stores this in a property of the current
         object
         
@@ -369,13 +369,13 @@ class elementObject():
         
     def addChild(self):
         '''
-        Adds a child elementObject to the current object and returns the
-        child elementObject that was just created.        
+        Adds a child element to the current object and returns the
+        child element that was just created.        
         
         :returns: an element object that is a child of the current object
-        :rtype: elementObject
+        :rtype: element
         '''
-        childObj = elementObject()
+        childObj = element()
         childObj.addParent(self)
         self.children.append(childObj)
         self.childPointer = len(self.children) - 1
@@ -384,7 +384,7 @@ class elementObject():
     def setStartAndEnd(self, startLine, startCol, endLine, endCol):
         '''
         This method sets the start line, start column, end line and end
-        column for the current elementObject.
+        column for the current element.
                 
         :param  startLine: the line the structure that is being described 
                            starts on.
@@ -429,7 +429,7 @@ class elementObject():
         the current object as well as any child objects
         
         :param  startObj: the object that is to be printed
-        :type startObj: elementObject
+        :type startObj: element
         '''
         startObj.printProperties()
         for child in startObj.getChildren():
