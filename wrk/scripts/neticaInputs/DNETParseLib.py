@@ -198,6 +198,7 @@ class elementObject():
         self.endLine = None
         self.endCol = None
         
+        
         self.parents = []
         self.children = []
         
