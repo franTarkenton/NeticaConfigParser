@@ -30,6 +30,8 @@ API DOC:
 ===============     
 """
 
+from neticaParser import NeticaData
+import os.path
 import re
 import sys
 
@@ -513,11 +515,8 @@ class DNETStructParser():
         object to the element object that describes there position
         in the file
         '''
-        print '-------------------- Populating Bayes Params --------------------'
-        # assume the first element in the structure is the bayes network values.
-        for elem in self.struct:
-            elem.printProperties()
-        sys.exit()
+        bayesParseObj = ParseBayesNet(self.struct, self.dnetFile)
+        bayesParseObj.parse()
 
 class ParseBayesNet():
     '''
@@ -527,30 +526,100 @@ class ParseBayesNet():
     other bayesian libraries.
     '''
     # This is the parser which will populate a BayesData object below
-    def __init__(self):
-        pass
+    def __init__(self, struct, dnetFile):
+        self.struct = struct
+        self.dnetFile = dnetFile
+        
+        # other class variable declarations
+        self.dnetFileMem = None
+        self.bayesDataObj = NeticaData.neticaNet()
     
-class BayesData():
+    def parse(self):
+        print '-------------------- Populating Bayes Params --------------------'
+        # assume the first element in the structure is the bayes network values.
+        self.__readFileIntoMemory()
+        firstLine = True
+        curLine = 0
+        skip = False
+        skipEndLine = 0
+        for elem in self.struct:
+            curLine = elem.getStartLine()
+            elem.printProperties('     ')
+            if firstLine:
+                self.__parseFirstLine(elem)
+                firstLine = False
+            else:
+                if skip:
+                    if curLine >= skipEndLine:
+                        skip = False
+                        skipEndLine = 0
+                    else:
+                        continue
+                elemType = self.__getElemType(elem)
+                if elemType.upper() == 'VISUAL':
+                    # skip visual elements
+                    skip = True
+                    skipEndLine = elem.getEndLine()
+                    elem.printProperties()
+                elif elemType.upper() == 'NODE':
+                    
+                else:
+                    elem.printProperties()
+        sys.exit()
+        
+    def __getElemType(self, elem):
+        '''
+        takes a line line like:
+            visual V1 {
+              or
+            node LU_hazard {
+        
+        and returns the type.  In the first case that would be 'visual',
+        in the second case it would be 'node'
+        '''
+
+        curLine = self.dnetFileMem[elem.getStartLine()]
+        elemList = self.__parseDeclarationLine(curLine)
+        return elemList[0]
     
-    def __init__(self ):
-        self.name = None
-        self.type = None  # Node, Vertex, network, edge
-        self.states = []
-        self.discrete = None # True or False
+    def __parseFirstLine(self, elem):
+        curLine = self.dnetFileMem[elem.getStartLine()]
+        elemList = self.__parseDeclarationLine(curLine)
+        # expecting the first element in the self.struct to be the bnet element, ie
+        # the element that describes the bayes network.  Next line is verifying that 
+        # this is the case!
+        if elemList[0].upper() <> 'BNET':
+            msg = 'expecting the first element in the struct to be a ' + \
+                  'BNET type.  There is either a problem with the ' + \
+                  'parser or the file! the line that was parsed as' + \
+                  'the first element line is (' + curLine + ')'
+            raise ValueError, msg
+        self.bayesDataObj.setName(elemList[1])
+        print elemList
         
-        # nature, decision, utility, constant
-        # 
-        self.kind = None
+    def __readFileIntoMemory(self):
+        '''
+        reads the dnet file into an in memory data structure to allow 
+        random access to various positions in the file.
+        '''
+        fh = open(self.dnetFile, 'r')
+        self.dnetFileMem = fh.readlines()
+        fh.close()
         
-        # chance - deterministic probableistic
-        # deterministic - no randomness involved in determining future state
-        # probablistic - likelyhood of something happening.
-        self.chance = None
-        self.parents = []
+    def __parseDeclarationLine(self, line):
+        '''
+        takes a line line like:
+            visual V1 {
+              or
+            node LU_hazard {
+        '''
+        line = line.strip()
+        partList = re.split('\s+', line)
+        return partList[:2]
         
-        self.probabilityTable = []
         
-    #def setVar(self, name, value):
+        
+    
         
     
         
@@ -697,6 +766,9 @@ class element():
         self.startLine = line
         self.startCol = col
         
+    def getStartLine(self):
+        return self.startLine
+        
     def setEnd(self, line, col):
         '''
         Sets the end column and line for the data structure that is 
@@ -711,6 +783,9 @@ class element():
         '''
         self.endLine = line
         self.endCol = col
+        
+    def getEndLine(self):
+        return self.endLine
         
     def getChildren(self):
         '''
@@ -802,7 +877,7 @@ class element():
         self.endLine = endLine
         self.endCol = endCol
         
-    def printProperties(self):
+    def printProperties(self, indentChar=''):
         '''
         Prints the:
             - start line
@@ -821,7 +896,7 @@ class element():
                 vals.append(num + 1)
             else:
                 vals.append('NONE')
-            print lbl[cnt], ' - ', vals[cnt]
+            print indentChar + lbl[cnt], ' - ', vals[cnt]
             cnt += 1        
         
     def printData(self, startObj):
@@ -842,8 +917,10 @@ class element():
     
     
 if __name__ == '__main__':
-    dnetFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\Car_Buyer.dnet.txt'
-    dnetTestFile = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica\testdata.txt'
+    neticaDataDir = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica_data'
+    dnetFile = os.path.join(neticaDataDir, r'Car_Buyer.dnet.txt')
+    dnetTestFile = os.path.join(neticaDataDir, r'testdata.txt')
+    
     startEndParse = DNETStructParser(dnetFile)
     startEndParse.parseStartEndPoints()
     startEndParse.populateBayesParams()
