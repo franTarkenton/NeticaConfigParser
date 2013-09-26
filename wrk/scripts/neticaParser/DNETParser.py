@@ -85,30 +85,8 @@ class parseDNET(object):
                     structIndicies
                 colNum += 1
             lineNum += 1
-        
         print starts
         print ends
-            
-    def buildRegularExpressions(self):
-        # read through once finding the start and end 
-        # of structures, 
-        # start = [20, 23, 24, 25, 34...
-        # end = [23, 24, 25, 32]
-        self.re_comments = re.compile(r"^\s*//.*")
-        self.re_startMultiLine = re.compile(r"^\s*\w+\s*=\s*$")
-        self.re_structStartMultiLine = re.compile(r"^\s*\w+\s+\w+\s+\{\s*$")
-        self.re_multiLineStringStart = re.compile(r'^\s*\w+\s*={1}\s*\"{1}.+\\{1}$')
-        self.re_multiLineStringEnd = re.compile(r'^\s*.*\"{1}\s*\;{1}$')
-        self.re_singleLineString = re.compile(r'^\s*\w+\s*=\s*\".+\"\;{1}$')
-        self.re_singleLineProperty = re.compile(r'^\s*\w+\s*=\s*(?!TRUE|FALSE)[a-zA-Z]+\;{1}$')
-        self.re_singleLineBooleanProperty = re.compile('^\s*\w+\s*=\s*(TRUE|FALSE){1}\;{1}$')
-        self.re_singleLineNumericProperty = re.compile('^\s*\w+\s*=\s*\d+\.*\d*\;{1}$')
-        self.re_singleLineListNumbers = re.compile(r'^\s*\w+\s*={1}\s*\({1}\s*[0-9]+(\s*,{1}\s*[0-9]+)*\s*\){1}\s*\;{1}\s*$')
-        self.re_singleLineListProperties = re.compile(r'^\s*\w+\s*={1}\s*\({1}\s*(?![0-9]+)[0-9a-zA-Z]+(\s*,{1}\s*(?![0-9]+)[0-9a-zA-Z]+)*\s*\){1}\s*\;{1}\s*$')
-        self.re_startMultiLineDataStruct = re.compile(r'^\s*\w+\s*=\s*$')
-        # TODO: the re_startMultiLineDataStruct matches 'var = ' followed by nothing.  May need to 
-        #       create another regex to detect the start of a multiline data struct that looks for the 
-        #       // column headers on the following line.
                 
     def parseLine(self):
         # only called when the structure is initialised, should only happen once
@@ -515,6 +493,8 @@ class DNETStructParser():
         object to the element object that describes there position
         in the file
         '''
+        if not self.struct:
+            self.parseStartEndPoints()
         bayesParseObj = ParseBayesNet(self.struct, self.dnetFile)
         bayesParseObj.parse()
 
@@ -534,6 +514,13 @@ class ParseBayesNet():
         self.dnetFileMem = None
         self.bayesDataObj = NeticaData.neticaNet()
     
+    def getBayesDataObj(self):
+        ''' returns the netica data object that this 
+        method is going to create and populate with the 
+        contents from a file.
+        '''
+        return self.bayesDataObj
+        
     def parse(self):
         print '-------------------- Populating Bayes Params --------------------'
         # assume the first element in the structure is the bayes network values.
@@ -562,10 +549,159 @@ class ParseBayesNet():
                     skipEndLine = elem.getEndLine()
                     elem.printProperties()
                 elif elemType.upper() == 'NODE':
-                    
+                    self.__parseNode(elem)
                 else:
                     elem.printProperties()
         sys.exit()
+        
+    def __parseNode(self, elem):
+        '''
+        Recieves and element object that describes a node.
+        This method will create a node in the bayesDataObject
+        along with all the various attributes.
+        '''
+        startLine = elem.getStartLine()
+        curLineNum = startLine
+        endLine = elem.getEndLine()
+        elemName = self.__getElemName(elem)
+        nodeObj = self.bayesDataObj.newNode(elemName)
+        # now increment the line:
+        curLineNum += 1
+        print endLine
+        while curLineNum <= endLine:
+            curLineNum = self.__parseAttributeLine(curLineNum, nodeObj)
+            print 'curLineNum is:', curLineNum
+            
+            
+        
+        print startLine, ' of node'
+        sys.exit()
+        
+    def __parseAttributeLine(self, lineNum, nodeObj ):
+        '''
+        Recieve an integer that corresponds with the line number
+        that is being read.  The script will read that line, and 
+        dump the data in that line into a NeticaData NodeObject 
+        attribute.  The method will then return the next line to 
+        read.  
+        
+        This method will also check to see if a line number corresponds
+        with the start of a defined structure. (ie an element that 
+        is enclosed by parethases.)  If it finds a defined structure
+        it will skip by it, assuming that it is not relevant, as most
+        encloing data structures in the dnet file contain visual 
+        information that is not applicable to the bayes model. 
+        
+        '''
+        line = self.__getLine(lineNum)
+        line = line.strip()
+        if line[len(line) - 1] == ';':
+            # single line attribute assignment
+            line = line[:len(line) - 1]
+            lineList = re.split('\s+=\s+', line)
+            nodeObj.enterAndValidateSimpleAttribute(lineList[0], lineList[1])
+            lineNum += 1
+        else:
+            # need to check that this is not part of an 
+            # element already
+            multiLine = ''
+            while True:
+                # __getElemEnd is going to return null, if the current
+                # lineNum is not part of a struct (ie a data structure
+                # that is enclosed with '{' and '}'.  If the current 
+                # line is the start of a struct it will return the line
+                # that corresponds with the end of that struct.
+                endLine = self.__getElemEnd(lineNum)
+                if endLine:
+                    # in other words if the current line points to a struct
+                    # skip over it...
+                    print 'lines: ', lineNum, 'to', endLine, 'are part of a struct'
+                    lineNum = endLine + 1
+                    continue
+                # retrieve the line for the current lineNum
+                line = self.__getLine(lineNum)
+                line = line.strip() # strip off concluding lines.
+                print 'line:', line
+                if multiLine:
+                    multiLine = multiLine + '\n ' + line
+                else:
+                    multiLine = line
+                if line[len(line) - 1] == ';':
+                    print 'MULTILINE:', multiLine
+                    lineNum += 1
+                    self.__parseAndEnterMultiLineString(multiLine, nodeObj);
+                    multiLine = re.split('\s+=\s+')
+                    
+                    break
+                lineNum += 1
+        return lineNum
+    
+    def __parseAndEnterMultiLineString(self, multiLine, nodeObj):
+        '''
+        This method receives a string that is made up of multiple lines.
+        It will parse it into either a list or a dictionary.  If the 
+        multiline string starts by declaring the column headers then it 
+        will convert it into a dictionary.  
+        
+        If it only contains a list of values then it will convert it into
+        a list.
+        
+        structure should look something like this:
+        var = // col1     col2   (
+        
+        '''
+        print 'multiLine:'
+        print multiLine
+        for matchObj in re.finditer('\s+//\s+', multiLine):
+            print 'position is:', matchObj.start()
+        # need to find the location of the '=' and then determine 
+        # if there is a '\\' character in the data.
+        for line in multiLine.split('\n'):
+            print 'line:', line
+        
+        
+    def __getPositions(self, inString, stringType):
+        '''
+        stringType needs to be equal to either 
+        equal or comment.  
+        
+        will return a list of where these parameters
+        have been found in the inString.  If none are 
+        found then will return an empty list.
+        '''
+        retList = []
+        regexDict = {'equal':'=',
+                     'comment':'//'}
+        stringType = stringType.lower()
+        if stringType not in regexDict.keys():
+            msg = 'This methods second argument must be either: ' + \
+                  '(' +  ','.join(regexDict.keys()) + ') you provided ' + \
+                  'the value: ' + str(stringType)
+            raise ValueError, msg
+        
+        for matchObj in re.finditer(regexDict[stringType], inString):
+            retList.append(matchObj.start())
+        return retList
+    
+    def __getElemEnd(self, lineNum):
+        '''
+        iterates through all the elements.  If it finds 
+        an element that starts with the line number 
+        supplied as an arguement it will return the 
+        endline of that element.
+        
+        If the linenumber does not correspond with the 
+        start of an element then it will return a null.
+        '''
+        tmpStruct = self.struct
+        for elem in tmpStruct:
+            startLine = elem.getStartLine()
+            if startLine == lineNum:
+                return elem.getEndLine()
+        return None
+        
+    def __getLine(self, lineNumber):
+        return self.dnetFileMem[lineNumber]
         
     def __getElemType(self, elem):
         '''
@@ -578,12 +714,23 @@ class ParseBayesNet():
         in the second case it would be 'node'
         '''
 
-        curLine = self.dnetFileMem[elem.getStartLine()]
+        curLine = self.__getLine(elem.getStartLine())
         elemList = self.__parseDeclarationLine(curLine)
         return elemList[0]
     
+    def __getElemName(self, elem):
+        ''' 
+        recieves an element object, returns the name of that
+        element by glueing together the info in the element object
+        with the information from the dnet file that is stored in 
+        memory.
+        '''
+        curLine = self.__getLine(elem.getStartLine())
+        elemList = self.__parseDeclarationLine(curLine)
+        return elemList[1]
+    
     def __parseFirstLine(self, elem):
-        curLine = self.dnetFileMem[elem.getStartLine()]
+        curLine = self.__getLine(elem.getStartLine())
         elemList = self.__parseDeclarationLine(curLine)
         # expecting the first element in the self.struct to be the bnet element, ie
         # the element that describes the bayes network.  Next line is verifying that 
@@ -620,6 +767,7 @@ class ParseBayesNet():
         
         
     
+     
         
     
         
