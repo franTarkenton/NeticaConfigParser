@@ -129,5 +129,100 @@ class neticaEdge(object):
     def __init__(self):
         pass
     
+class ValueTable(object):
+    '''
+    This class is designed to store a junction table.  A junction
+    takes all the possible values from a source or parent table and
+    identifies how these different combinations of values translate
+    into probabilities for a new set of values.  
     
+    So a parent table (table 1.) might look like this:
+    
+    rating  |  type
+    ------------------
+    High    | Caribou
+    High    | Moose
+    Medium  | Caribou
+    Medium  | Moose
+    Low     | Caribou
+    Low     | Moose
+    
+    The junction table is used to help describe how a set of 
+    values above might impact Predator Density.  So that said
+    the possible outcomes are described below:
+    
+    Predator Density:
+    (High, Moderate, Low)
+    
+    so a junction table could end up looking like this:
+    
+    rating    | type    ->    PredDensity (high) | PredDensity (moderate) | PredDensity (low)
+    ------------------------------------------------------------------------------------------
+    High      | Caribou ->        70%            |          10%           |   20%
+    High      | Moose   ->        60%            |          20%           |   20%
+    Medium    | Caribou ->        60%            |          30%           |   10%
+    etc...
+    
+    This class is an object model to help store this information.
+        
+    :ivar parentColumns: This is a list of the parent columns.  When 
+                         values are added to this object references to 
+                         input parent values will have the same order
+                         as the columns described here.
+    :ivar states: This is a list of the different values the node
+                  that contains this table may take on.  When values
+                  are added to this table they will include the probabiliitis
+                  of these different states being realized.  The order
+                  of the values added to this table must be in the same
+                  order as the states are in when they are assigned in 
+                  the constructor.
+    :ivar valueStruct: 
+    '''
+    
+    def __init__(self, states, parentColumns):
+        '''
+        States are the possible states that are going to be stored
+        in this object.  Later on we will assign values to these
+        possible states.  The values corresond with probabilities
+        of each given state.
+        
+        The parent columns are the columns that the various parent
+        values line up with.
+        '''
+        self.states = states
+        self.parentColumns = parentColumns
+        self.valueStruct = []
+        
+    
+        
+    def addValue(self, valueList, parentValues):
+        '''
+        Receives a a value list that describes the probabilities
+        of different states when the parent values are as
+        they are described in the parameter parentValues.
+        
+        valuelist ends up looking something like this:
+        [.20, .50, .30]
+        
+        While the parentValues end up looking like this:
+        ['High', 'High', 'Moderate']
+        
+        So if the states where entered as:
+        ['Red', 'Yellow', 'Green']
+        
+        then the value list and parent values are telling us that
+        if the parent values are high, high, and moderate then 
+        there is a 20% chance that this node is red, a 50% chance
+        that its Yellow and a 30% chance that its green!
+        '''
+        self.valueStruct.append( [valueList, parentValues] )
+        
+        
+        
+        
+        
+        
+        
+        
+        
     

@@ -34,6 +34,7 @@ from neticaParser import NeticaData
 import os.path
 import re
 import sys
+import numpy
 
 class parseDNET(object):
     inputDnetFile = ''
@@ -542,6 +543,8 @@ class ParseBayesNet():
                         skipEndLine = 0
                     else:
                         continue
+                # element type is the type of object that is being 
+                # described.  Could be NODE, or VISUAL or BNET
                 elemType = self.__getElemType(elem)
                 if elemType.upper() == 'VISUAL':
                     # skip visual elements
@@ -571,9 +574,7 @@ class ParseBayesNet():
         while curLineNum <= endLine:
             curLineNum = self.__parseAttributeLine(curLineNum, nodeObj)
             print 'curLineNum is:', curLineNum
-            
-            
-        
+                    
         print startLine, ' of node'
         sys.exit()
         
@@ -595,17 +596,21 @@ class ParseBayesNet():
         '''
         line = self.__getLine(lineNum)
         line = line.strip()
+        # is it a single line assignement, ie does it 
+        # look like 
+        # atttribute = value
         if line[len(line) - 1] == ';':
             # single line attribute assignment
             line = line[:len(line) - 1]
             lineList = re.split('\s+=\s+', line)
             nodeObj.enterAndValidateSimpleAttribute(lineList[0], lineList[1])
             lineNum += 1
+        # its a multiline value, ie its a prob or a functable
         else:
             # need to check that this is not part of an 
             # element already
             multiLine = ''
-            while True:
+            while True:          
                 # __getElemEnd is going to return null, if the current
                 # lineNum is not part of a struct (ie a data structure
                 # that is enclosed with '{' and '}'.  If the current 
@@ -629,7 +634,9 @@ class ParseBayesNet():
                 if line[len(line) - 1] == ';':
                     print 'MULTILINE:', multiLine
                     lineNum += 1
-                    self.__parseAndEnterMultiLineString(multiLine, nodeObj);
+                    dataDict = self.__parseAndEnterMultiLineString(multiLine, nodeObj);
+                    print 'dataDict is: ', dataDict
+                    # TODO: am here!  Next step to code is to enter this information into a data structure and then ultimately into the netica data object
                     multiLine = re.split('\s+=\s+')
                     
                     break
@@ -652,13 +659,282 @@ class ParseBayesNet():
         '''
         print 'multiLine:'
         print multiLine
-        for matchObj in re.finditer('\s+//\s+', multiLine):
-            print 'position is:', matchObj.start()
-        # need to find the location of the '=' and then determine 
-        # if there is a '\\' character in the data.
-        for line in multiLine.split('\n'):
-            print 'line:', line
+        returnDict = {}
         
+        type = self.__getAtribType(multiLine)
+        
+        
+        # first parse the comments that are embedded in the multiline
+        # statement.  Multilines are expected to have comments embedded
+        # in them that describe what the values are inside the string
+        # comments are prefaced with the characters //
+        commentPositionList = self.__getPositions(multiLine, 'comment')
+        # There are not any comments in this line,  throw error.
+        if not commentPositionList:
+            # did not write the parser to deal with this situation
+            msg = 'The multiline parameter is as follows:\n' + \
+                  multiLine + '\n\n This multiline statemment does' + \
+                  'not have any comment characters, ie \'//\' charcters ' + \
+                  'and this method is expecting it to.  FYI there is a ' + \
+                  'unittest that was created to help with the development ' +\
+                  'of this method.  It will likely be useful in adding this ' + \
+                  'additional behaviour.  Its in the module DNETParser_test ' +\
+                  'and the test is called : ' + \
+                  'test__ParseBayesNet__parseAndEnterMultiLineString' 
+            raise ValueError, msg
+        
+        
+        # second determine what type of attribute this multi line is.
+        # if its a prob then send to the prob parser.  
+        # if its a functable then send to the functable parser.
+        # Otherwise throw an error as these are the only two types
+        # of attributes that I have currently come accross.  The comment 
+        # positions are also passed to these methods as they help
+        # with the parsing.
+        if type == 'prob':
+            self.__parseProbMultiLineAttribute(multiLine, commentPositionList)
+        elif type == 'functable':
+            # TODO: The method __parseFuncTableMultiLineAttribute has not been coded yet, finish this method.
+            self.__parseFuncTableMultiLineAttribute(multiLine)
+        
+        
+        
+        
+        # here is where I am 10-2-2013 (above this line)
+        # code below need to be moved into methods that parse either 
+        # a function table or a probability table.
+        
+        
+        
+        commentPositionList = self.__getPositions(multiLine, 'comment')
+        # There are not any comments in this line,  throw error.
+        if not commentPositionList:
+            # did not write the parser to deal with this situation
+            msg = 'The multiline parameter is as follows:\n' + \
+                  multiLine + '\n\n This multiline statemment does' + \
+                  'not have any comment characters, ie \'//\' charcters ' + \
+                  'and this method is expecting it to.  FYI there is a ' + \
+                  'unittest that was created to help with the development ' +\
+                  'of this method.  It will likely be useful in adding this ' + \
+                  'additional behaviour.  Its in the module DNETParser_test ' +\
+                  'and the test is called : ' + \
+                  'test__ParseBayesNet__parseAndEnterMultiLineString' 
+            raise ValueError, msg
+        elif len(commentPositionList) == 1:
+            returnDict = self.__parseSingleListMultiLineProbAttribute(multiLine)
+        else:
+            returnDict = self.__parseMultiListMultiLineProbAttribute(multiLine)
+        return returnDict
+    
+    def __parseProbMultiLineAttribute(self, multiLine, commentPositionList):
+        '''
+        Recieves a multiline attribute value containing a probability
+        table.  This method will parse the probability table into a data
+        structure.
+        '''
+        if len(commentPositionList) == 1:
+            returnDict = self.__parseSingleListMultiLineProbAttribute(multiLine)
+        else:
+            returnDict = self.__parseMultiListMultiLineProbAttribute(multiLine)
+        return returnDict
+    
+    def __getAttributeHeaders(self, multiLine):
+        '''
+        data structs in the dnet file can take on the following 
+        organizations:
+        
+        probs = 
+        //   NoResult     NoDefects    OneDefect         // T1           R1         T2           CC    
+        (((((1,           0,           0),               // NoTest       NoResult   NoTest       Peach 
+            (1,           0,           0)),              // NoTest       NoResult   NoTest       Lemon 
+            ...
+        or 
+            probs = 
+        // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
+        (((1,           0,           0,           0),             // NoTest       Peach 
+          (1,           0,           0,           0)),            // NoTest       Lemon
+          ...
+        
+        or  
+
+            functable = 
+                            // T1           T2           B             CC    
+        ((((0,               // NoTest       NoTest       DontBuy       Peach 
+            0),              // NoTest       NoTest       DontBuy       Lemon 
+           (60,              // NoTest       NoTest       Buy           Peach 
+            ...
+            
+        
+        This method will parse the first line, and return:
+        (in order of the examples)
+        
+        ['NoResult', 'NoDefects', 'OneDefect'], ['T1', 'R1', 'T2', 'CC']
+        '''
+        print '\nmultiLine', multiLine
+        firstList = []
+        equalPosList = self.__getPositions(multiLine, 'equal')
+        commentPositions = self.__getPositions(multiLine, 'comment')
+        newLine = self.__getPositions(multiLine[commentPositions[0]:], 'new_line')
+        print 'newLine', newLine
+        # determine if the first line of comments contains two 
+        # dimensions of comments, ie, 
+        # // var var var //var var
+        # as opposed to 
+        # // var var var
+        if ( len(commentPositions) > 1 ) and \
+            commentPositions[0] < newLine[0] and \
+            commentPositions[1] < newLine[0]:
+            # Extracting and converting the first set of comments into
+            # lists.
+            firstString = multiLine[commentPositions[0]:commentPositions[1]]
+            firstString = firstString.replace('//','').replace('\n','').strip()
+            firstList = re.split('\s+', firstString)
+            print 'firstList', firstList
+            
+            # Extracting and converting the second set of comments
+            secString = multiLine[commentPositions[1]:newLine[0] + commentPositions[0]]
+            secString = secString.replace('//','').replace('\n','').strip()
+            secList = re.split('\s+', secString)
+            print 'secList', secList
+        else:
+            secString = multiLine[commentPositions[0]: newLine[0] + commentPositions[0]]
+            secString = secString.replace('//','').replace('\n','').strip()
+            secList = re.split('\s+', secString)
+            print 'secList', secList
+        return firstList, secList
+    
+    def __parseMultiListMultiLineProbAttribute(self, multiLine):
+        '''
+        This method is designed to parse a multiline probability / junction table.
+        The table is expected to link input values against output states with 
+        probabilities.  Examples of what the strings that need to be parsed might 
+        look like:
+        
+            probs = 
+        // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
+        (((1,           0,           0,           0),             // NoTest       Peach 
+          (1,           0,           0,           0)),            // NoTest       Lemon 
+         ((0,           0.9,         0.1,         0),             // Steering     Peach 
+          (0,           0.4,         0.6,         0)),            // Steering     Lemon 
+         ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
+          (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
+         ((0,           0.9,         0.1,         0),             // Transmission Peach 
+          (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
+
+        In the example above the line: 
+        // NoResult     NoDefects    OneDefect    TwoDefects, identifies the column headers
+        or the possible output states. The values under each of these columns idenfies the 
+        likelyhood of a particular state given the inputs.
+        
+        so the second set of comments on the first line is // T1           CC   
+        T1 and CC are the columns descriging the parent or source values  
+        values under each of these columns describe the combinations of 
+        possible values from these parents.
+        
+        This method parses this into a probability table 
+        
+        
+        '''
+        # get rid of all the comments first, 
+        # then try to parse the data struct
+        print 'input is:'
+        print multiLine
+        # These lines are extracting the column names or 
+        # comments from the data structure, in other words the 
+        # comments
+        equalPosList = self.__getPositions(multiLine, 'equal')
+        commentPositions = self.__getPositions(multiLine, 'comment')
+        print 'equalPosList', equalPosList
+        print 'commentPositions', commentPositions
+        print ''
+        atribList1, atribList2 = self.__getAttributeHeaders(multiLine)
+        
+        # These lines are extracting the actual data from the
+        # multiline attribute.
+        dataStructString = ''
+        for oneLine in multiLine.split('\n'):
+            print 'oneLine', oneLine
+            equalPosList = self.__getPositions(oneLine, 'equal')
+            if equalPosList:
+                oneLine = oneLine[equalPosList[0] + 1:]
+            commentPosList = self.__getPositions(oneLine, 'comment')
+            print 'commentPosList', commentPosList
+            if commentPosList:
+                oneLine = oneLine[:commentPosList[0]]
+            oneLine = oneLine.strip()
+            if oneLine:
+                dataStructString = dataStructString + ' ' + oneLine
+        print 'dataStructString:', dataStructString
+        if dataStructString[len(dataStructString)-1] == ';':
+            dataStructString = dataStructString[:len(dataStructString)-1]
+        var = eval(dataStructString)
+        var = numpy.array(var, numpy.double)
+        print 'var is', var
+        dim = var.shape
+        print 'dim', dim
+        if len(dim) > 2:
+            # Needs to be reshaped down to a two dimensional structure
+            print 'reshaping...'
+            newShapeParam = 1
+            cnter = 0
+            while cnter < len(dim) - 1:
+                newShapeParam = newShapeParam * dim[cnter]
+                cnter += 1
+            
+            
+#             if len(dim) > 3:
+#                 # not configured to deal with greater than a 3 dimension
+#                 # structure.  needs to be added
+#                 errMsg = "The shape of the data structure is " + str(dim) + '\n' + \
+#                          "Currently only configured to deal with either a 2 or a " + \
+#                          "3 dimensional data struct.  Enter in here code that adds " + \
+#                          "this capability and then add condition to the unit test " + \
+#                          "test__ParseBayesNet__parseMultiListMultiLineProbAttribute"
+#                 raise ValueError, errMsg
+#             var = var.reshape((dim[0] * dim[1],4))
+            var = var.reshape(newShapeParam, len(atribList2))
+        var = var.tolist()
+        print 'var', var
+
+    def __parseSingleListMultiLineProbAttribute(self, multiLine):
+        '''
+        This method will take a data structure described in a string
+        like this:
+        
+        probs = 
+                 // Peach        Lemon
+                 (0.8,         0.2);
+                 
+        and converts it into this:
+        
+        {'Lemon': 0.2, 'Peach': 0.8}
+        '''
+        commentPositionList = self.__getPositions(multiLine, 'comment')
+
+        print 'commentPos', commentPositionList
+        leftPosList = self.__getPositions(multiLine, 'left_paren')
+        rightPosList = self.__getPositions(multiLine, 'right_paren')
+        print 'left', leftPosList
+        columnString = multiLine[commentPositionList[0]:leftPosList[0]]
+        columnString = columnString.replace('//', '').strip()
+        columnList = re.split('\s+', columnString)
+        
+        dataString = multiLine[leftPosList[0] + 1:rightPosList[0]].strip()
+        dataList = re.split('\s*,\s*', dataString)
+                    
+        if all(self.__isNum(v) for v in dataList):
+            dataList = [ float(x) for x in dataList ]
+        #TODO: should verify that there is only one value and raise an error if not
+        returnDict = dict(zip(columnList, dataList))
+        print 'returnDict', returnDict
+        return returnDict
+    
+    def __isNum(self, numString):
+        try:
+            float(numString)
+            return True
+        except ValueError:
+            return False
         
     def __getPositions(self, inString, stringType):
         '''
@@ -671,7 +947,10 @@ class ParseBayesNet():
         '''
         retList = []
         regexDict = {'equal':'=',
-                     'comment':'//'}
+                     'comment':'//', 
+                     'left_paren': '\(',
+                     'right_paren': '\)', 
+                     'new_line': '\n'}
         stringType = stringType.lower()
         if stringType not in regexDict.keys():
             msg = 'This methods second argument must be either: ' + \
@@ -715,6 +994,16 @@ class ParseBayesNet():
         '''
 
         curLine = self.__getLine(elem.getStartLine())
+        elemList = self.__parseDeclarationLine(curLine)
+        return elemList[0]
+    
+    def __getAtribType(self, curLine):
+        ''' 
+        Recieves something like 
+        var = some set of values
+        
+        returns 'var'
+        '''
         elemList = self.__parseDeclarationLine(curLine)
         return elemList[0]
     
