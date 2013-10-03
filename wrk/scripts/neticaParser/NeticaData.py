@@ -129,7 +129,7 @@ class neticaEdge(object):
     def __init__(self):
         pass
     
-class ValueTable(object):
+class ProbsValueTable(object):
     '''
     This class is designed to store a junction table.  A junction
     takes all the possible values from a source or parent table and
@@ -192,7 +192,6 @@ class ValueTable(object):
         self.states = states
         self.parentColumns = parentColumns
         self.valueStruct = []
-        
     
         
     def addValue(self, valueList, parentValues):
@@ -217,12 +216,24 @@ class ValueTable(object):
         '''
         self.valueStruct.append( [valueList, parentValues] )
         
+    def addValues(self, likelyHoodTable, parentValuesTable):
+        '''
+        Takes a likelyhood table that is a list of lists, and the 
+        parent values table that is also a list of lists and enters
+        them into a data structure in this class.  This class then 
+        has methods and properties that make retrieval of this 
+        information into a bayesian framework easier.
+        '''
+        # first verify that they both contain the same number of
+        # rows
+        print 'likelyHoodTable', likelyHoodTable
+        print 'parentValuesTable', parentValuesTable
         
         
         
         
         
         
-        
+ 
         
     

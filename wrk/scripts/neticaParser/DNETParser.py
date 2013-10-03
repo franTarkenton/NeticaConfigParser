@@ -35,6 +35,7 @@ import os.path
 import re
 import sys
 import numpy
+import itertools
 
 class parseDNET(object):
     inputDnetFile = ''
@@ -735,8 +736,101 @@ class ParseBayesNet():
         if len(commentPositionList) == 1:
             returnDict = self.__parseSingleListMultiLineProbAttribute(multiLine)
         else:
-            returnDict = self.__parseMultiListMultiLineProbAttribute(multiLine)
+            probTable = self.__parseMultiListMultiLineProbAttribute(multiLine)
+            self.__getNeticaProbabilityObject(returnDict, multiLine)
         return returnDict
+    
+    def __getNeticaProbabilityObject(self, probTable, multiLine):
+        # get the comment  lists first!
+        columnList, ParentColumnList = self.__getAttributeHeaders(multiLine)
+        probsTable = NeticaData.ProbsValueTable(columnList, ParentColumnList)
+        # now need to get extract the parent values that line up with the 
+        # propability table
+        parentValues = self.__getParentValuesFromProbsTable(multiLine)
+        
+        
+    def __getParentValuesFromProbsTable(self, multiLine):
+        '''
+        This method takes a multiline string and returns a 
+        list of lists containing the parent values that 
+        correspond with the various likelyhood distribution
+        that are described in the table.
+        
+        In a nutshell it will take this:
+        probs = 
+         // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
+        (((1,           0,           0,           0),             // NoTest       Peach 
+        (1,           0,           0,           0)),            // NoTest       Lemon 
+        ((0,           0.9,         0.1,         0),             // Steering     Peach 
+        (0,           0.4,         0.6,         0)),            // Steering     Lemon 
+        ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
+        (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
+        ((0,           0.9,         0.1,         0),             // Transmission Peach 
+        (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
+        
+        and turn it into this:
+          [['NoTest', 'Peach'],
+           ['NoTest', 'Lemon'],
+           ['Steering', 'Peach'], 
+           ['Steering', 'Lemon'], 
+           ['Fuel_Elect', 'Peach'], 
+           ['Fuel_Elect', 'Lemon'], 
+           ['Transmission', 'Peach'], 
+           ['Transmission', 'Lemon']]
+
+        
+        '''
+        commentPositions = self.__getPositions(multiLine, 'comment')
+        #print multiLine
+        #print '----------------------'
+        #print commentPositions
+        # With a probabiliyt table the assumption is that the 
+        # first two sets of columns define the:
+        #   1. headers for the states of the prob table
+        #   2. columns for the input values
+        # and the rest of the columns correspond with the 
+        # actual values from the parent table that correspond
+        # with the various sets of likelyhoods.
+        valueList = []
+        parentValuePositions = commentPositions[2:]
+        #print len(multiLine)
+        for position in parentValuePositions:
+            #print 'position', position
+            # set the initial line end position
+            lineEndPos = len(multiLine)
+            # create an iterator that finds the newline positions in front 
+            # of the current comment string
+            iterObj = re.finditer('\n',multiLine[position:] )
+            # find out how many values are in the iterator
+            iterCnt = sum(1 for _ in iterObj)
+            # because iterators cannot be reset the only way to 
+            # set the iterator back to 0 is to recreate so...
+            iterObj = re.finditer('\n',multiLine[position:] )
+            #print 'iterCnt', iterCnt
+            if iterCnt:
+                firstReObj = iterObj.next()
+                lineEndPos = firstReObj.start() + position
+            #print 'lineEndPos', lineEndPos
+            #print 'comment is', multiLine[position:lineEndPos]
+            comment = multiLine[position:lineEndPos]
+            # at this point comment var contains only a comment part
+            # of the what ever comment is being processed.  Next step 
+            # is to remove the // characters and trailing spaces, and 
+            # parse the string into a list.  Stuff that list into another
+            # list
+            comment = comment.replace("//", '').replace(";", '').strip()
+            commentList = re.split('\s{2,}', comment)
+            #print 'commentList', commentList
+            valueList.append(commentList)
+        #print valueList
+        return valueList
+            
+                   
+            
+
+        
+        
+        
     
     def __getAttributeHeaders(self, multiLine):
         '''
@@ -833,68 +927,45 @@ class ParseBayesNet():
         
         This method parses this into a probability table 
         
-        
         '''
-        # get rid of all the comments first, 
-        # then try to parse the data struct
-        print 'input is:'
-        print multiLine
-        # These lines are extracting the column names or 
-        # comments from the data structure, in other words the 
-        # comments
         equalPosList = self.__getPositions(multiLine, 'equal')
         commentPositions = self.__getPositions(multiLine, 'comment')
-        print 'equalPosList', equalPosList
-        print 'commentPositions', commentPositions
-        print ''
         atribList1, atribList2 = self.__getAttributeHeaders(multiLine)
-        
+        print 'atribList1', atribList1
+        print 'atribList2', atribList2
         # These lines are extracting the actual data from the
         # multiline attribute.
         dataStructString = ''
         for oneLine in multiLine.split('\n'):
-            print 'oneLine', oneLine
+            parentInputValuesString = oneLine
+            
             equalPosList = self.__getPositions(oneLine, 'equal')
             if equalPosList:
-                oneLine = oneLine[equalPosList[0] + 1:]
-            commentPosList = self.__getPositions(oneLine, 'comment')
-            print 'commentPosList', commentPosList
+                probabilityValues = probabilityValues[equalPosList[0] + 1:]
+            commentPosList = self.__getPositions(probabilityValues, 'comment')
             if commentPosList:
-                oneLine = oneLine[:commentPosList[0]]
-            oneLine = oneLine.strip()
-            if oneLine:
-                dataStructString = dataStructString + ' ' + oneLine
-        print 'dataStructString:', dataStructString
+                probabilityValues = probabilityValues[:commentPosList[0]]
+            probabilityValues = probabilityValues.strip()
+            if probabilityValues:
+                dataStructString = dataStructString + ' ' + probabilityValues
+        
         if dataStructString[len(dataStructString)-1] == ';':
             dataStructString = dataStructString[:len(dataStructString)-1]
         var = eval(dataStructString)
         var = numpy.array(var, numpy.double)
-        print 'var is', var
         dim = var.shape
-        print 'dim', dim
         if len(dim) > 2:
             # Needs to be reshaped down to a two dimensional structure
-            print 'reshaping...'
             newShapeParam = 1
             cnter = 0
             while cnter < len(dim) - 1:
                 newShapeParam = newShapeParam * dim[cnter]
                 cnter += 1
-            
-            
-#             if len(dim) > 3:
-#                 # not configured to deal with greater than a 3 dimension
-#                 # structure.  needs to be added
-#                 errMsg = "The shape of the data structure is " + str(dim) + '\n' + \
-#                          "Currently only configured to deal with either a 2 or a " + \
-#                          "3 dimensional data struct.  Enter in here code that adds " + \
-#                          "this capability and then add condition to the unit test " + \
-#                          "test__ParseBayesNet__parseMultiListMultiLineProbAttribute"
-#                 raise ValueError, errMsg
-#             var = var.reshape((dim[0] * dim[1],4))
-            var = var.reshape(newShapeParam, len(atribList2))
+            var = var.reshape(newShapeParam, len(atribList1))
         var = var.tolist()
-        print 'var', var
+        print 'var is:'
+        print var
+        return var
 
     def __parseSingleListMultiLineProbAttribute(self, multiLine):
         '''

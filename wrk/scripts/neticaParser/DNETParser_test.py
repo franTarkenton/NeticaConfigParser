@@ -158,9 +158,26 @@ class TestBayesParser(unittest.TestCase):
     def test__ParseBayesNet__parseMultiListMultiLineProbAttribute(self):
         struct = self.dnetParser.getNodeStartendLines()
         parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
-        parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString4)
-        #parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString3)
+#         multi2 = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString2)
+#         multi3 = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString3)
+#         multi4 = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString4)
         
+        expect2 = [[1.0, 0.0, 0.0, 0.0], [1.0, 0.0, 0.0, 0.0], [0.0, 0.9, 0.1, 0.0], [0.0, 0.4, 0.6, 0.0], [0.0, 0.8, 0.2, 0.0], [0.0, 0.1333333, 0.5333334, 0.3333333], [0.0, 0.9, 0.1, 0.0], [0.0, 0.4, 0.6, 0.0]]
+        expect3 = [[0.75, 0.25, 0.0], [0.25, 0.75, 0.0], [0.25, 0.5, 0.25]]
+        expect4 = [[0.75, 0.25, 0.0], [1.0, 0.0, 0.0], [0.25, 0.75, 0.0], [0.5, 0.5, 0.0], [0.0, 0.5, 0.5], [0.25, 0.75, 0.0], [0.5, 0.5, 0.0], [1.0, 0.0, 0.0], [0.0, 1.0, 0.0], [0.5, 0.5, 0.0], [0.0, 0.25, 0.75], [0.25, 0.75, 0.0], [0.25, 0.75, 0.0], [1.0, 0.0, 0.0], [0.0, 0.75, 0.25], [0.5, 0.5, 0.0], [0.0, 0.0, 1.0], [0.25, 0.75, 0.0]]
+        
+        testData = [[self.multilineString2, expect2], \
+                    [self.multilineString3, expect3], \
+                    [self.multilineString4, expect4]]
+        
+        for testValues in testData:
+            retVal = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(testValues[0])
+            msg = 'Calling the method __parseMultiListMultiLineProbAttribute ' + \
+                  'with the data:\n' + str(testValues[0]) + '\n' + 'expecting the ' + \
+                  'following values back:\n' + str(testValues[1]) + '\n however ' + \
+                  'got the following values back:\n' + str(retVal) + '\n'
+            self.assertEqual(retVal, testValues[1], msg)
+
     def test__ParseBayesNet__getAtribType(self):
         struct = self.dnetParser.getNodeStartendLines()
         parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
@@ -174,7 +191,30 @@ class TestBayesParser(unittest.TestCase):
                      ') for the submitted line: (' + str(testRow[0]) + \
                      ') expecting the value: ' + str(testRow[1])
             self.assertEqual(retVal, testRow[1], errMsg)
+            
+    def test_ParseBayesNet__getParentValuesFromProbsTable(self):
+        struct = self.dnetParser.getNodeStartendLines()
+        parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
         
+        expec2 = [['NoTest', 'Peach'], ['NoTest', 'Lemon'], ['Steering', 'Peach'], ['Steering', 'Lemon'], ['Fuel_Elect', 'Peach'], ['Fuel_Elect', 'Lemon'], ['Transmission', 'Peach'], ['Transmission', 'Lemon']]
+        expec3 = [['<1 km/km2'], ['1-2 km/km2'], ['2-3 km/km2']]
+        expec4 = [['<1 km/km2', 'High', 'Present'], ['<1 km/km2', 'High', 'Not present'], ['<1 km/km2', 'Moderate', 'Present'], ['<1 km/km2', 'Moderate', 'Not present'], ['<1 km/km2', 'Low', 'Present'], ['<1 km/km2', 'Low', 'Not present'], ['1-2 km/km2', 'High', 'Present'], ['1-2 km/km2', 'High', 'Not present'], ['1-2 km/km2', 'Moderate', 'Present'], ['1-2 km/km2', 'Moderate', 'Not present'], ['1-2 km/km2', 'Low', 'Present'], ['1-2 km/km2', 'Low', 'Not present'], ['2-3 km/km2', 'High', 'Present'], ['2-3 km/km2', 'High', 'Not present'], ['2-3 km/km2', 'Moderate', 'Present'], ['2-3 km/km2', 'Moderate', 'Not present'], ['2-3 km/km2', 'Low', 'Present'], ['2-3 km/km2', 'Low', 'Not present']]
+        
+        testData = [[self.multilineString2, expec2],\
+                    [self.multilineString3, expec3],\
+                    [self.multilineString4, expec4],]
+        
+        for testCaseData in testData:
+                    
+            retVal = parseBayesNet._ParseBayesNet__getParentValuesFromProbsTable(testCaseData[0])
+            errMsg = 'Testing the parsing of parent values from a probability table! ' + \
+                     'Results returned by the function __getParentValuesFromProbsTable are: \n\'' + \
+                     str(retVal) + '\'\n expecting the results: \n\'' + str(testCaseData[1]) + '\'\n The string ' + \
+                     'that was sent to be parsed is: \n\''  + str(testCaseData[0])
+            
+            self.assertEqual(testCaseData[1], retVal, errMsg)
+
+
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     #unittest.main()
@@ -184,5 +224,5 @@ if __name__ == "__main__":
     testSuite = unittest.TestSuite()
     
 #     testSuite.addTest(TestBayesParser('test__ParseBayesNet__getAttributeHeaders'))
-    testSuite.addTest(TestBayesParser('test__ParseBayesNet__parseMultiListMultiLineProbAttribute'))
+    testSuite.addTest(TestBayesParser('test_ParseBayesNet__getParentValuesFromProbsTable'))
     unittest.TextTestRunner(verbosity=2).run(testSuite)
