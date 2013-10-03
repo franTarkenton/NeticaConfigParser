@@ -205,7 +205,7 @@ class TestBayesParser(unittest.TestCase):
                     [self.multilineString4, expec4],]
         
         for testCaseData in testData:
-                    
+            print 'running test...'
             retVal = parseBayesNet._ParseBayesNet__getParentValuesFromProbsTable(testCaseData[0])
             errMsg = 'Testing the parsing of parent values from a probability table! ' + \
                      'Results returned by the function __getParentValuesFromProbsTable are: \n\'' + \

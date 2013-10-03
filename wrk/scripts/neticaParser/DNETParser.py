@@ -780,18 +780,32 @@ class ParseBayesNet():
 
         
         '''
+        # getting the positions in the multiline string for the start
+        # of each comment.  (comments prefaced by //)
         commentPositions = self.__getPositions(multiLine, 'comment')
-        #print multiLine
-        #print '----------------------'
-        #print commentPositions
-        # With a probabiliyt table the assumption is that the 
-        # first two sets of columns define the:
-        #   1. headers for the states of the prob table
-        #   2. columns for the input values
-        # and the rest of the columns correspond with the 
-        # actual values from the parent table that correspond
-        # with the various sets of likelyhoods.
+        
         valueList = []
+        
+        # get the position of the second set of comments - this is the header
+        # for the current 
+        startPosition = commentPositions[1]
+        # now get the end position
+        matchObj = re.match('//.*', multiLine[startPosition:] )
+        endPos = matchObj.end() + startPosition
+        justFirstColumns = multiLine[startPosition:endPos]
+        #print 'headers:', multiLine[startPosition:endPos]
+        # now need to find the number of spaces over for each additional 
+        # comment.  The first will always be 0.
+        findIterObj = re.finditer('\S+\s+', justFirstColumns)
+        columnPositions = []
+        for mtch in findIterObj:
+            columnPositions.append( mtch.start() )
+            
+        # now remove the first value as it only identifies the start of the 
+        # comment followed by the white space.  ie // followed by a space that 
+        # preceds the first comment.
+        columnPositions.pop(0)
+        #print 'columnPositions', columnPositions
         parentValuePositions = commentPositions[2:]
         #print len(multiLine)
         for position in parentValuePositions:
@@ -813,15 +827,31 @@ class ParseBayesNet():
             #print 'lineEndPos', lineEndPos
             #print 'comment is', multiLine[position:lineEndPos]
             comment = multiLine[position:lineEndPos]
+            #print 'comment', comment
+            innerList = []
+            cnt = 0
+            while cnt < len(columnPositions):
+                if cnt + 1 >= len(columnPositions):
+                    valueToAdd = comment[columnPositions[cnt]:]
+                else:
+                    valueToAdd = comment[columnPositions[cnt]:columnPositions[cnt + 1]]
+                valueToAdd = valueToAdd.replace("//", '').replace(";", '').strip()
+                #print valueToAdd
+                innerList.append(valueToAdd)
+                cnt += 1
+            #for colPos in columnPositions:
+                
+            
             # at this point comment var contains only a comment part
             # of the what ever comment is being processed.  Next step 
             # is to remove the // characters and trailing spaces, and 
             # parse the string into a list.  Stuff that list into another
             # list
-            comment = comment.replace("//", '').replace(";", '').strip()
-            commentList = re.split('\s{2,}', comment)
+            #comment = comment.replace("//", '').replace(";", '').strip()
+            #commentList = re.split('\s{2,}', comment)
             #print 'commentList', commentList
-            valueList.append(commentList)
+            #valueList.append(commentList)
+            valueList.append(innerList)
         #print valueList
         return valueList
             
