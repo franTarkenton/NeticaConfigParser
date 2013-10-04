@@ -601,13 +601,21 @@ class ParseBayesNet():
         # look like 
         # atttribute = value
         if line[len(line) - 1] == ';':
-            # single line attribute assignment
+            # single line attribute assignment, pulls the attribute, 
+            # parses it, and enters into the node object
             line = line[:len(line) - 1]
             lineList = re.split('\s+=\s+', line)
             nodeObj.enterAndValidateSimpleAttribute(lineList[0], lineList[1])
             lineNum += 1
         # its a multiline value, ie its a prob or a functable
         else:
+            # multiline statements need to be handled differently from 
+            # single line statements.  This is the logic for mulitline 
+            # statements, like:
+            #  a) embedded nodes
+            #  b) probability tables
+            #  c) function tables
+            #            
             # need to check that this is not part of an 
             # element already
             multiLine = ''
@@ -635,11 +643,7 @@ class ParseBayesNet():
                 if line[len(line) - 1] == ';':
                     print 'MULTILINE:', multiLine
                     lineNum += 1
-                    dataDict = self.__parseAndEnterMultiLineString(multiLine, nodeObj);
-                    print 'dataDict is: ', dataDict
-                    # TODO: am here!  Next step to code is to enter this information into a data structure and then ultimately into the netica data object
-                    multiLine = re.split('\s+=\s+')
-                    
+                    self.__parseAndEnterMultiLineString(multiLine, nodeObj);                    
                     break
                 lineNum += 1
         return lineNum
@@ -684,7 +688,6 @@ class ParseBayesNet():
                   'test__ParseBayesNet__parseAndEnterMultiLineString' 
             raise ValueError, msg
         
-        
         # second determine what type of attribute this multi line is.
         # if its a prob then send to the prob parser.  
         # if its a functable then send to the functable parser.
@@ -693,40 +696,28 @@ class ParseBayesNet():
         # positions are also passed to these methods as they help
         # with the parsing.
         if type == 'prob':
-            self.__parseProbMultiLineAttribute(multiLine, commentPositionList)
+            # if its a probability, there are two types.  Root nodes who's probabilities only describe the starting probabilities fo the nodes state, and junction nodes that define the state depending on the state of parents.
+            if len(commentPositionList) == 1:
+                neticaProbabilityTable = self.__parseSingleListMultiLineProbAttribute(multiLine)
+            else:
+                neticaProbabilityTable = self.__parseProbMultiLineAttribute(multiLine, commentPositionList)
+            # TODO: the neticaProbabilityTable now needs to be attached to the nodeObject
+            nodeObj.setProbabilityTable(neticaProbabilityTable)
         elif type == 'functable':
-            # TODO: The method __parseFuncTableMultiLineAttribute has not been coded yet, finish this method.
-            self.__parseFuncTableMultiLineAttribute(multiLine)
-        
-        
-        
-        
-        # here is where I am 10-2-2013 (above this line)
-        # code below need to be moved into methods that parse either 
-        # a function table or a probability table.
-        
-        
-        
-        commentPositionList = self.__getPositions(multiLine, 'comment')
-        # There are not any comments in this line,  throw error.
-        if not commentPositionList:
-            # did not write the parser to deal with this situation
-            msg = 'The multiline parameter is as follows:\n' + \
-                  multiLine + '\n\n This multiline statemment does' + \
-                  'not have any comment characters, ie \'//\' charcters ' + \
-                  'and this method is expecting it to.  FYI there is a ' + \
-                  'unittest that was created to help with the development ' +\
-                  'of this method.  It will likely be useful in adding this ' + \
-                  'additional behaviour.  Its in the module DNETParser_test ' +\
-                  'and the test is called : ' + \
-                  'test__ParseBayesNet__parseAndEnterMultiLineString' 
-            raise ValueError, msg
-        elif len(commentPositionList) == 1:
-            returnDict = self.__parseSingleListMultiLineProbAttribute(multiLine)
-        else:
-            returnDict = self.__parseMultiListMultiLineProbAttribute(multiLine)
-        return returnDict
-    
+            # TODO: The method __parseFuncTableMultiLineAttribute has not been coded yet, finish this method.  It should return a functiontable Object that gets returned, and then add it to the nodeObject.
+            neticafuncTableObj = self.__parseFuncTableMultiLineAttribute(multiLine)
+            nodeObj.setFunctionTableObject(neticafuncTableObj)
+            
+    def __parseFuncTableMultiLineAttribute(self, multiLine):
+        '''
+        recieves a multiline string that contains a function table.
+        parses the function table, creates a function table object
+        enters the information correctly into the function table object
+        and returns the function table object
+        '''
+        parents = self.__getParentValuesFromTable(multiLine, 1)
+        print parents
+            
     def __parseProbMultiLineAttribute(self, multiLine, commentPositionList):
         '''
         Recieves a multiline attribute value containing a probability
@@ -734,51 +725,37 @@ class ParseBayesNet():
         structure.
         '''
         if len(commentPositionList) == 1:
-            returnDict = self.__parseSingleListMultiLineProbAttribute(multiLine)
+            neticaProbabilityTable = self.__parseSingleListMultiLineProbAttribute(multiLine)
         else:
             probTable = self.__parseMultiListMultiLineProbAttribute(multiLine)
-            self.__getNeticaProbabilityObject(returnDict, multiLine)
-        return returnDict
+            neticaProbabilityTable = self.__getNeticaProbabilityObject(returnDict, multiLine)
+        return neticaProbabilityTable
     
     def __getNeticaProbabilityObject(self, probTable, multiLine):
         # get the comment  lists first!
         columnList, ParentColumnList = self.__getAttributeHeaders(multiLine)
-        probsTable = NeticaData.ProbsValueTable(columnList, ParentColumnList)
+        neticaProbsTable = NeticaData.ProbsValueTable(columnList, ParentColumnList)
         # now need to get extract the parent values that line up with the 
         # propability table
         parentValues = self.__getParentValuesFromProbsTable(multiLine)
+        # now enter these values into a probability table
+        neticaProbsTable.setValues(probTable, parentValues)
+        return neticaProbsTable
         
-        
-    def __getParentValuesFromProbsTable(self, multiLine):
+    def __getParentValuesFromTable(self, multiLine, numberOfHeaderComments=2):
         '''
-        This method takes a multiline string and returns a 
-        list of lists containing the parent values that 
-        correspond with the various likelyhood distribution
-        that are described in the table.
+        used to parse out the parent values that go into either a probability
+        table or a function table.
         
-        In a nutshell it will take this:
-        probs = 
-         // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
-        (((1,           0,           0,           0),             // NoTest       Peach 
-        (1,           0,           0,           0)),            // NoTest       Lemon 
-        ((0,           0.9,         0.1,         0),             // Steering     Peach 
-        (0,           0.4,         0.6,         0)),            // Steering     Lemon 
-        ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
-        (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
-        ((0,           0.9,         0.1,         0),             // Transmission Peach 
-        (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
+        For probability tables set the numberOfHeaderComments to 2.  This number
+        is used to identify that there are two sets of comments before the 
+        comments that represent the parent values.  The second set of comments
+        is used to determine the width of the columns.
         
-        and turn it into this:
-          [['NoTest', 'Peach'],
-           ['NoTest', 'Lemon'],
-           ['Steering', 'Peach'], 
-           ['Steering', 'Lemon'], 
-           ['Fuel_Elect', 'Peach'], 
-           ['Fuel_Elect', 'Lemon'], 
-           ['Transmission', 'Peach'], 
-           ['Transmission', 'Lemon']]
-
-        
+        For function tables use numberOfHeaderComments = 1.  This number
+        represents the fact that there is only one comment demarkation.  it 
+        identifies the column names and their widths for subsequent parent 
+        values.
         '''
         # getting the positions in the multiline string for the start
         # of each comment.  (comments prefaced by //)
@@ -788,7 +765,7 @@ class ParseBayesNet():
         
         # get the position of the second set of comments - this is the header
         # for the current 
-        startPosition = commentPositions[1]
+        startPosition = commentPositions[numberOfHeaderComments - 1]
         # now get the end position
         matchObj = re.match('//.*', multiLine[startPosition:] )
         endPos = matchObj.end() + startPosition
@@ -796,17 +773,17 @@ class ParseBayesNet():
         #print 'headers:', multiLine[startPosition:endPos]
         # now need to find the number of spaces over for each additional 
         # comment.  The first will always be 0.
-        findIterObj = re.finditer('\S+\s+', justFirstColumns)
+        findIterObj = re.finditer('\S+\s*', justFirstColumns)
         columnPositions = []
         for mtch in findIterObj:
             columnPositions.append( mtch.start() )
-            
+        print 'columnPositions', columnPositions
         # now remove the first value as it only identifies the start of the 
         # comment followed by the white space.  ie // followed by a space that 
         # preceds the first comment.
         columnPositions.pop(0)
         #print 'columnPositions', columnPositions
-        parentValuePositions = commentPositions[2:]
+        parentValuePositions = commentPositions[numberOfHeaderComments:]
         #print len(multiLine)
         for position in parentValuePositions:
             #print 'position', position
@@ -853,6 +830,40 @@ class ParseBayesNet():
             #valueList.append(commentList)
             valueList.append(innerList)
         #print valueList
+        return valueList
+    
+    def __getParentValuesFromProbsTable(self, multiLine):
+        '''
+        This method takes a multiline string and returns a 
+        list of lists containing the parent values that 
+        correspond with the various likelyhood distribution
+        that are described in the table.
+        
+        In a nutshell it will take this:
+        probs = 
+         // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
+        (((1,           0,           0,           0),             // NoTest       Peach 
+        (1,           0,           0,           0)),            // NoTest       Lemon 
+        ((0,           0.9,         0.1,         0),             // Steering     Peach 
+        (0,           0.4,         0.6,         0)),            // Steering     Lemon 
+        ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
+        (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
+        ((0,           0.9,         0.1,         0),             // Transmission Peach 
+        (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
+        
+        and turn it into this:
+          [['NoTest', 'Peach'],
+           ['NoTest', 'Lemon'],
+           ['Steering', 'Peach'], 
+           ['Steering', 'Lemon'], 
+           ['Fuel_Elect', 'Peach'], 
+           ['Fuel_Elect', 'Lemon'], 
+           ['Transmission', 'Peach'], 
+           ['Transmission', 'Lemon']]
+
+        
+        '''
+        valueList = self.__getParentValuesFromTable(multiLine, 2)
         return valueList
             
                    
@@ -968,7 +979,7 @@ class ParseBayesNet():
         dataStructString = ''
         for oneLine in multiLine.split('\n'):
             parentInputValuesString = oneLine
-            
+            probabilityValues = oneLine
             equalPosList = self.__getPositions(oneLine, 'equal')
             if equalPosList:
                 probabilityValues = probabilityValues[equalPosList[0] + 1:]
@@ -1010,6 +1021,8 @@ class ParseBayesNet():
         
         {'Lemon': 0.2, 'Peach': 0.8}
         '''
+        
+        #TODO: 10-3-2013 current this method parses up this data structure into a dictionary.  We need to get that entered as a NeticaProabilityTable.  in the module NeticaData
         commentPositionList = self.__getPositions(multiLine, 'comment')
 
         print 'commentPos', commentPositionList
@@ -1027,8 +1040,10 @@ class ParseBayesNet():
             dataList = [ float(x) for x in dataList ]
         #TODO: should verify that there is only one value and raise an error if not
         returnDict = dict(zip(columnList, dataList))
-        print 'returnDict', returnDict
-        return returnDict
+        
+        neticaProbabilityTable = NeticaData.ProbsValueTable(columnList)
+        neticaProbabilityTable.setRootValues(dataList)
+        return neticaProbabilityTable
     
     def __isNum(self, numString):
         try:

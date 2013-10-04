@@ -52,7 +52,7 @@ class neticaNode(object):
         self.kind = None # Nature, Decision, Utility, Constant
         self.chance = None # deterministic probabilistic
         self.parents = [] # dependent nodes.  Root level will not have any parents, ie the bottom of the tree or the start of the network
-        self.probabilityTable = []
+        self.probabilityTable = None
         self.discrete = None # True or False
         
         self.validationDict = self.getValidationDict()
@@ -79,6 +79,13 @@ class neticaNode(object):
                           'title': None}
         return validationDict
         
+    def setProbabilityTable(self, neticaProbabilityTable):
+        '''
+        Enters a ProbsValueTable to the current nodes
+        probs attribute
+        '''
+        self.probabilityTable = neticaProbabilityTable
+    
     def enterAndValidateSimpleAttribute(self, property, value):
         property = property.lower()
         value = value.lower()
@@ -118,8 +125,6 @@ class neticaNode(object):
                 elif value[len(value) - 1] == '"' and value[0] == '"':
                     value = value[:len(value) - 1]
                     value = value[1:]
-
-                    
             print 'property:', property
             print 'value:', value
             setattr(self, property, value)
@@ -179,7 +184,7 @@ class ProbsValueTable(object):
     :ivar valueStruct: 
     '''
     
-    def __init__(self, states, parentColumns):
+    def __init__(self, states, parentColumns=None):
         '''
         States are the possible states that are going to be stored
         in this object.  Later on we will assign values to these
@@ -192,42 +197,77 @@ class ProbsValueTable(object):
         self.states = states
         self.parentColumns = parentColumns
         self.valueStruct = []
-    
+        self.parentValueStruct = []
+        self.struct = {}
         
-    def addValue(self, valueList, parentValues):
+    def setRootValues(self, likelyHoodTable):
         '''
-        Receives a a value list that describes the probabilities
-        of different states when the parent values are as
-        they are described in the parameter parentValues.
+        This type of probability table has no priors.  It describes only 
+        the likelyhoods of each of the states upon initiation of this node.
         
-        valuelist ends up looking something like this:
-        [.20, .50, .30]
-        
-        While the parentValues end up looking like this:
-        ['High', 'High', 'Moderate']
-        
-        So if the states where entered as:
-        ['Red', 'Yellow', 'Green']
-        
-        then the value list and parent values are telling us that
-        if the parent values are high, high, and moderate then 
-        there is a 20% chance that this node is red, a 50% chance
-        that its Yellow and a 30% chance that its green!
+        Examples: 
+            probs = 
+        // Peach        Lemon        
+          (0.8,         0.2);
         '''
-        self.valueStruct.append( [valueList, parentValues] )
-        
-    def addValues(self, likelyHoodTable, parentValuesTable):
+        self.valueStruct = likelyHoodTable
+            
+    def setValues(self, likelyHoodTable, parentValuesTable):
         '''
         Takes a likelyhood table that is a list of lists, and the 
         parent values table that is also a list of lists and enters
         them into a data structure in this class.  This class then 
         has methods and properties that make retrieval of this 
         information into a bayesian framework easier.
+        
+        If information exists in the struct it gets over 
+        written
         '''
         # first verify that they both contain the same number of
         # rows
         print 'likelyHoodTable', likelyHoodTable
         print 'parentValuesTable', parentValuesTable
+        
+        likelyHoodLength = len(likelyHoodTable)
+        parentValLength = len(parentValuesTable)
+        
+        if likelyHoodLength <> parentValLength:
+            errMsg = 'The number of values in the probability table need ' + \
+                     'to the identical to the number of values in the ' + \
+                     'parent value table.\n Parent Values Length: ' + \
+                     str(parentValLength) + '\n Probability Tables Length: ' + \
+                     str(likelyHoodLength) + ' '
+            raise ValueError, errMsg
+        
+        self.valueStruct = likelyHoodTable
+        self.parentValueStruct = parentValuesTable
+        # end here!  but leaving the code below which allows you 
+        # to create a dictionary for rapid access of probabilites 
+        # for a given set of parent values.
+        
+        # now combine these values into a dictionary
+#         rowCnt = 0
+#         while rowCnt < len(likelyHoodTable):
+#             dictKeyList = parentValuesTable[rowCnt]
+#             probsForKey = likelyHoodTable[rowCnt]
+#             startDict = self.struct
+#             print 'startDict', startDict
+#             for key in parentValuesTable[rowCnt]:
+#                 print 'key', key
+#                 if not startDict.has_key(key):
+#                     startDict[key] = {}
+#                 # is this the last key?
+#                 if key == parentValuesTable[rowCnt][len( parentValuesTable[rowCnt]) - 1]:
+#                     startDict[key] = likelyHoodTable[rowCnt]
+#                 else:
+#                     startDict = startDict[key]
+#             
+#             rowCnt += 1
+#         print 'self.struct', self.struct
+        
+        
+        
+        
         
         
         

@@ -57,6 +57,33 @@ class TestBayesParser(unittest.TestCase):
         self.simpleLine1 = '    defdispform = LABELBOX; '
         self.simpleLine2 = '    states = (Peach, Lemon);'
 
+        self.multilineFuncTable1 = '    functable = \n' + \
+                                   '                             // LU_hazard     Population_risk\n' + \
+                                   '         ((#0,               // None          None            \n' + \
+                                   '           #1,               // None          Low             \n' + \
+                                   '           #2,               // None          Moderate-low    \n' + \
+                                   '           #3,               // None          Moderate-high   \n' + \
+                                   '           #4),              // None          High            \n' + \
+                                   '          (#1,               // Low           None            \n' + \
+                                   '           #1,               // Low           Low             \n' + \
+                                   '           #2,               // Low           Moderate-low    \n' + \
+                                   '           #3,               // Low           Moderate-high   \n' + \
+                                   '           #4),              // Low           High            \n' + \
+                                   '          (#2,               // Moderate-low  None            \n' + \
+                                   '           #2,               // Moderate-low  Low             \n' + \
+                                   '           #2,               // Moderate-low  Moderate-low    \n' + \
+                                   '           #3,               // Moderate-low  Moderate-high   \n' + \
+                                   '           #4),              // Moderate-low  High            \n' + \
+                                   '          (#3,               // Moderate-high None            \n' + \
+                                   '           #3,               // Moderate-high Low             \n' + \
+                                   '           #3,               // Moderate-high Moderate-low    \n' + \
+                                   '           #3,               // Moderate-high Moderate-high   \n' + \
+                                   '           #4),              // Moderate-high High            \n' + \
+                                   '          (#4,               // High          None            \n' + \
+                                   '           #4,               // High          Low             \n' + \
+                                   '           #4,               // High          Moderate-low    \n' + \
+                                   '           #4,               // High          Moderate-high   \n' + \
+                                   '           #4));             // High          High            ;'
 
     def tearDown(self):
         pass
@@ -211,10 +238,30 @@ class TestBayesParser(unittest.TestCase):
                      'Results returned by the function __getParentValuesFromProbsTable are: \n\'' + \
                      str(retVal) + '\'\n expecting the results: \n\'' + str(testCaseData[1]) + '\'\n The string ' + \
                      'that was sent to be parsed is: \n\''  + str(testCaseData[0])
-            
+            print retVal
             self.assertEqual(testCaseData[1], retVal, errMsg)
+    
+    def test_ParseBayesNet__getNeticaProbabilityObject(self):
+        struct = self.dnetParser.getNodeStartendLines()
+        parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
+        probTable = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString2)
+        print 'probTable', probTable
+        parentVals = parseBayesNet._ParseBayesNet__getParentValuesFromProbsTable(self.multilineString2)
+        parseBayesNet._ParseBayesNet__getNeticaProbabilityObject(probTable, self.multilineString2)
+        
+        #probTable.addValues(probTable, parentVals)
+        
+    def test_ParseBayesNet__parseSingleListMultiLineProbAttribute(self):
+        struct = self.dnetParser.getNodeStartendLines()
+        parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
+        parseBayesNet._ParseBayesNet__parseSingleListMultiLineProbAttribute(self.multilineString1)
 
-
+    def test_ParseBayesNet__parseFuncTableMultiLineAttribute(self):
+        struct = self.dnetParser.getNodeStartendLines()
+        parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
+        parseBayesNet._ParseBayesNet__parseFuncTableMultiLineAttribute(self.multilineFuncTable1)
+        
+        
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     #unittest.main()
@@ -225,4 +272,5 @@ if __name__ == "__main__":
     
 #     testSuite.addTest(TestBayesParser('test__ParseBayesNet__getAttributeHeaders'))
     testSuite.addTest(TestBayesParser('test_ParseBayesNet__getParentValuesFromProbsTable'))
+    testSuite.addTest(TestBayesParser('test_ParseBayesNet__parseFuncTableMultiLineAttribute'))
     unittest.TextTestRunner(verbosity=2).run(testSuite)
