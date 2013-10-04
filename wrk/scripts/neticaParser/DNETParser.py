@@ -362,7 +362,6 @@ class parseDNET(object):
         #print 
         rest = line.split('=')[1].replace('{', '').replace('}', '').strip().split(';')
         print rest
-        sys.exit()
         
     def getStructStartEnds(self):
         fh = open(self.inputDnetFile, 'r')
@@ -499,6 +498,7 @@ class DNETStructParser():
             self.parseStartEndPoints()
         bayesParseObj = ParseBayesNet(self.struct, self.dnetFile)
         bayesParseObj.parse()
+        
 
 class ParseBayesNet():
     '''
@@ -556,7 +556,6 @@ class ParseBayesNet():
                     self.__parseNode(elem)
                 else:
                     elem.printProperties()
-        sys.exit()
         
     def __parseNode(self, elem):
         '''
@@ -571,15 +570,14 @@ class ParseBayesNet():
         nodeObj = self.bayesDataObj.newNode(elemName)
         # now increment the line:
         curLineNum += 1
-        print endLine
+        print 'endLine:', endLine
         while curLineNum <= endLine:
-            curLineNum = self.__parseAttributeLine(curLineNum, nodeObj)
+            curLineNum = self.__parseAttributeLine(curLineNum, nodeObj, endLine)
             print 'curLineNum is:', curLineNum
                     
         print startLine, ' of node'
-        sys.exit()
         
-    def __parseAttributeLine(self, lineNum, nodeObj ):
+    def __parseAttributeLine(self, lineNum, nodeObj, endOfNodeLine ):
         '''
         Recieve an integer that corresponds with the line number
         that is being read.  The script will read that line, and 
@@ -619,12 +617,15 @@ class ParseBayesNet():
             # need to check that this is not part of an 
             # element already
             multiLine = ''
-            while True:          
+            while True:
                 # __getElemEnd is going to return null, if the current
                 # lineNum is not part of a struct (ie a data structure
                 # that is enclosed with '{' and '}'.  If the current 
                 # line is the start of a struct it will return the line
                 # that corresponds with the end of that struct.
+                if lineNum == endOfNodeLine:
+                    lineNum += 1
+                    break
                 endLine = self.__getElemEnd(lineNum)
                 if endLine:
                     # in other words if the current line points to a struct
@@ -642,8 +643,9 @@ class ParseBayesNet():
                     multiLine = line
                 if line[len(line) - 1] == ';':
                     print 'MULTILINE:', multiLine
+                    print 'lineNum', lineNum
                     lineNum += 1
-                    self.__parseAndEnterMultiLineString(multiLine, nodeObj);                    
+                    self.__parseAndEnterMultiLineString(multiLine, nodeObj);
                     break
                 lineNum += 1
         return lineNum
@@ -664,10 +666,8 @@ class ParseBayesNet():
         '''
         print 'multiLine:'
         print multiLine
-        returnDict = {}
         
-        type = self.__getAtribType(multiLine)
-        
+        atribType = self.__getAtribType(multiLine)
         
         # first parse the comments that are embedded in the multiline
         # statement.  Multilines are expected to have comments embedded
@@ -675,27 +675,27 @@ class ParseBayesNet():
         # comments are prefaced with the characters //
         commentPositionList = self.__getPositions(multiLine, 'comment')
         # There are not any comments in this line,  throw error.
-        if not commentPositionList:
-            # did not write the parser to deal with this situation
-            msg = 'The multiline parameter is as follows:\n' + \
-                  multiLine + '\n\n This multiline statemment does' + \
-                  'not have any comment characters, ie \'//\' charcters ' + \
-                  'and this method is expecting it to.  FYI there is a ' + \
-                  'unittest that was created to help with the development ' +\
-                  'of this method.  It will likely be useful in adding this ' + \
-                  'additional behaviour.  Its in the module DNETParser_test ' +\
-                  'and the test is called : ' + \
-                  'test__ParseBayesNet__parseAndEnterMultiLineString' 
-            raise ValueError, msg
+#         if not commentPositionList:
+#             # did not write the parser to deal with this situation
+#             msg = 'The multiline parameter is as follows:\n' + \
+#                   multiLine + '\n\n This multiline statemment does' + \
+#                   'not have any comment characters, ie \'//\' charcters ' + \
+#                   'and this method is expecting it to.  FYI there is a ' + \
+#                   'unittest that was created to help with the development ' +\
+#                   'of this method.  It will likely be useful in adding this ' + \
+#                   'additional behaviour.  Its in the module DNETParser_test ' +\
+#                   'and the test is called : ' + \
+#                   'test__ParseBayesNet__parseAndEnterMultiLineString' 
+#             raise ValueError, msg
         
-        # second determine what type of attribute this multi line is.
+        # second determine what atribType of attribute this multi line is.
         # if its a prob then send to the prob parser.  
         # if its a functable then send to the functable parser.
         # Otherwise throw an error as these are the only two types
         # of attributes that I have currently come accross.  The comment 
         # positions are also passed to these methods as they help
         # with the parsing.
-        if type == 'prob':
+        if atribType == 'probs':
             # if its a probability, there are two types.  Root nodes who's probabilities only describe the starting probabilities fo the nodes state, and junction nodes that define the state depending on the state of parents.
             if len(commentPositionList) == 1:
                 neticaProbabilityTable = self.__parseSingleListMultiLineProbAttribute(multiLine)
@@ -703,10 +703,19 @@ class ParseBayesNet():
                 neticaProbabilityTable = self.__parseProbMultiLineAttribute(multiLine, commentPositionList)
             # TODO: the neticaProbabilityTable now needs to be attached to the nodeObject
             nodeObj.setProbabilityTable(neticaProbabilityTable)
-        elif type == 'functable':
-            # TODO: The method __parseFuncTableMultiLineAttribute has not been coded yet, finish this method.  It should return a functiontable Object that gets returned, and then add it to the nodeObject.
+        elif atribType == 'functable':
             neticafuncTableObj = self.__parseFuncTableMultiLineAttribute(multiLine)
             nodeObj.setFunctionTableObject(neticafuncTableObj)
+        elif atribType == 'comment':
+            # don't need comments so skip over
+            pass
+        else:
+            msg = 'Found a multiline attribute with the atribType:(' + str(atribType) + \
+                  ') This parser does not recognize that atribType.  Throwing an ' + \
+                  'error here so you are aware that this atribType has been found.' + \
+                  'could probably safely comment out the error, or catch it and ' + \
+                  'proceed!'
+            raise ValueError, msg
             
     def __parseFuncTableMultiLineAttribute(self, multiLine):
         '''
@@ -716,7 +725,12 @@ class ParseBayesNet():
         and returns the function table object
         '''
         parents = self.__getParentValuesFromTable(multiLine, 1)
-        print parents
+        print 'parents:'
+        retVal = self.__parseMultilineValues(multiLine)
+        #columnList, ParentColumnList = self.__getAttributeHeaders(multiLine)
+        atribLoL = self.__getAttributeHeaders(multiLine)
+        neticaFuncTable = NeticaData.FuncTable(atribLoL[1], retVal, parents)
+        print neticaFuncTable
             
     def __parseProbMultiLineAttribute(self, multiLine, commentPositionList):
         '''
@@ -727,8 +741,8 @@ class ParseBayesNet():
         if len(commentPositionList) == 1:
             neticaProbabilityTable = self.__parseSingleListMultiLineProbAttribute(multiLine)
         else:
-            probTable = self.__parseMultiListMultiLineProbAttribute(multiLine)
-            neticaProbabilityTable = self.__getNeticaProbabilityObject(returnDict, multiLine)
+            probTable = self.__parseMultilineValues(multiLine)
+            neticaProbabilityTable = self.__getNeticaProbabilityObject(probTable, multiLine)
         return neticaProbabilityTable
     
     def __getNeticaProbabilityObject(self, probTable, multiLine):
@@ -865,13 +879,6 @@ class ParseBayesNet():
         '''
         valueList = self.__getParentValuesFromTable(multiLine, 2)
         return valueList
-            
-                   
-            
-
-        
-        
-        
     
     def __getAttributeHeaders(self, multiLine):
         '''
@@ -907,7 +914,6 @@ class ParseBayesNet():
         '''
         print '\nmultiLine', multiLine
         firstList = []
-        equalPosList = self.__getPositions(multiLine, 'equal')
         commentPositions = self.__getPositions(multiLine, 'comment')
         newLine = self.__getPositions(multiLine[commentPositions[0]:], 'new_line')
         print 'newLine', newLine
@@ -938,7 +944,7 @@ class ParseBayesNet():
             print 'secList', secList
         return firstList, secList
     
-    def __parseMultiListMultiLineProbAttribute(self, multiLine):
+    def __parseMultilineValues(self, multiLine):
         '''
         This method is designed to parse a multiline probability / junction table.
         The table is expected to link input values against output states with 
@@ -969,6 +975,8 @@ class ParseBayesNet():
         This method parses this into a probability table 
         
         '''
+        type = self.__getAtribType(multiLine)
+        print 'type', type
         equalPosList = self.__getPositions(multiLine, 'equal')
         commentPositions = self.__getPositions(multiLine, 'comment')
         atribList1, atribList2 = self.__getAttributeHeaders(multiLine)
@@ -977,6 +985,7 @@ class ParseBayesNet():
         # These lines are extracting the actual data from the
         # multiline attribute.
         dataStructString = ''
+        arrayType = 'float'
         for oneLine in multiLine.split('\n'):
             parentInputValuesString = oneLine
             probabilityValues = oneLine
@@ -987,26 +996,64 @@ class ParseBayesNet():
             if commentPosList:
                 probabilityValues = probabilityValues[:commentPosList[0]]
             probabilityValues = probabilityValues.strip()
+            #if not self.__is_number(probabilityValues):
+            probabilityValues, arrayType = self.__getJustValue(probabilityValues, arrayType)
+                
+            print 'probabilityValues', probabilityValues
             if probabilityValues:
                 dataStructString = dataStructString + ' ' + probabilityValues
         
         if dataStructString[len(dataStructString)-1] == ';':
             dataStructString = dataStructString[:len(dataStructString)-1]
-        var = eval(dataStructString)
-        var = numpy.array(var, numpy.double)
+        print dataStructString
+        rawvar = eval(dataStructString)
+        if arrayType == 'float':
+            var = numpy.array(rawvar, numpy.double)
+        else:
+            var = numpy.array(rawvar)
         dim = var.shape
         if len(dim) > 2:
             # Needs to be reshaped down to a two dimensional structure
             newShapeParam = 1
             cnter = 0
+            print 'dim', dim
             while cnter < len(dim) - 1:
                 newShapeParam = newShapeParam * dim[cnter]
+                
                 cnter += 1
-            var = var.reshape(newShapeParam, len(atribList1))
+            print 'newShapeParam', newShapeParam
+            print 'len(atribList1)', len(atribList1)
+            print 'len(atribList2)', len(atribList2)
+            if type == 'functable':
+                var = var.reshape(newShapeParam, dim[len(dim) - 1])
+            else:
+                var = var.reshape(newShapeParam, len(atribList1))
         var = var.tolist()
         print 'var is:'
         print var
         return var
+    
+    def __getJustValue(self, value, type):
+        '''
+        Recieves a value, removes the characters '(', ')', ',', ';' and 
+        then tests to see if its a number.  If its not a valid number then
+        it will wrap the value in quotes and return it.
+        
+        '''
+        tmpVal = value[0:]
+        tmpVal = tmpVal.replace('\n', '').replace('(', '').replace(')', '').replace(',','').replace(';', '')
+        if not self.__is_number(tmpVal) and tmpVal:
+            newVal = "'" + tmpVal + "'"
+            value = value.replace(tmpVal, newVal)
+            type = 'str'
+        return value, type
+    
+    def __is_number(self, num):
+        try:
+            float(num)
+            return True
+        except ValueError:
+            return False
 
     def __parseSingleListMultiLineProbAttribute(self, multiLine):
         '''

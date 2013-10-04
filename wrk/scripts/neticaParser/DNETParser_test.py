@@ -121,7 +121,8 @@ class TestBayesParser(unittest.TestCase):
         retVal = parseBayesNet._ParseBayesNet__getPositions(testData1, 'comment')
         self.assertEqual(retVal, [10], msg)
         retVal = parseBayesNet._ParseBayesNet__getPositions(testData2, 'comment')
-        self.assertEqual(retVal, [9, 67, 148, 227, 307, 386, 466, 545, 625, 704], msg)
+        print 'retVal', retVal
+        self.assertEqual(retVal, [10, 68, 149, 228, 308, 387, 467, 546, 626, 705], msg)
         print 'retVal:', retVal
     
     def test__ParseBayesNet__parseAndEnterMultiLineString(self):
@@ -198,7 +199,7 @@ class TestBayesParser(unittest.TestCase):
                     [self.multilineString4, expect4]]
         
         for testValues in testData:
-            retVal = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(testValues[0])
+            retVal = parseBayesNet._ParseBayesNet__parseMultilineValues(testValues[0])
             msg = 'Calling the method __parseMultiListMultiLineProbAttribute ' + \
                   'with the data:\n' + str(testValues[0]) + '\n' + 'expecting the ' + \
                   'following values back:\n' + str(testValues[1]) + '\n however ' + \
@@ -244,7 +245,7 @@ class TestBayesParser(unittest.TestCase):
     def test_ParseBayesNet__getNeticaProbabilityObject(self):
         struct = self.dnetParser.getNodeStartendLines()
         parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
-        probTable = parseBayesNet._ParseBayesNet__parseMultiListMultiLineProbAttribute(self.multilineString2)
+        probTable = parseBayesNet._ParseBayesNet__parseMultilineValues(self.multilineString2)
         print 'probTable', probTable
         parentVals = parseBayesNet._ParseBayesNet__getParentValuesFromProbsTable(self.multilineString2)
         parseBayesNet._ParseBayesNet__getNeticaProbabilityObject(probTable, self.multilineString2)
@@ -264,13 +265,10 @@ class TestBayesParser(unittest.TestCase):
         
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
-    #unittest.main()
+    unittest.main()
     
     # run a single test
         # run selected tests that are added using addTest
-    testSuite = unittest.TestSuite()
-    
-#     testSuite.addTest(TestBayesParser('test__ParseBayesNet__getAttributeHeaders'))
-    testSuite.addTest(TestBayesParser('test_ParseBayesNet__getParentValuesFromProbsTable'))
-    testSuite.addTest(TestBayesParser('test_ParseBayesNet__parseFuncTableMultiLineAttribute'))
-    unittest.TextTestRunner(verbosity=2).run(testSuite)
+#     testSuite = unittest.TestSuite()
+#     testSuite.addTest(TestBayesParser('test_ParseBayesNet__parseFuncTableMultiLineAttribute'))
+#     unittest.TextTestRunner(verbosity=2).run(testSuite)

@@ -42,6 +42,11 @@ class neticaNet(object):
         self.nodeDict[name] = nodeObj
         return self.nodeDict[name]
         
+    def getRootNodes(self, recalc=True): 
+        if not rootNodes or recalc:
+            for nodekey in nodeDict.keys():
+                print nodekey
+         
 
 class neticaNode(object):
     
@@ -53,6 +58,7 @@ class neticaNode(object):
         self.chance = None # deterministic probabilistic
         self.parents = [] # dependent nodes.  Root level will not have any parents, ie the bottom of the tree or the start of the network
         self.probabilityTable = None
+        self.funcTable = None
         self.discrete = None # True or False
         
         self.validationDict = self.getValidationDict()
@@ -76,7 +82,9 @@ class neticaNode(object):
                           'parents': None, 
                           'probs': None, 
                           'discrete': [True, False],
-                          'title': None}
+                          'title': None, 
+                          'functable': None,
+                          'measure':['ratio', 'nominal', 'local', 'ordinal', 'interval']}
         return validationDict
         
     def setProbabilityTable(self, neticaProbabilityTable):
@@ -85,6 +93,12 @@ class neticaNode(object):
         probs attribute
         '''
         self.probabilityTable = neticaProbabilityTable
+        
+    def setFunctionTableObject(self, funcTable):
+        '''
+        
+        '''
+        self.funcTable = funcTable
     
     def enterAndValidateSimpleAttribute(self, property, value):
         property = property.lower()
@@ -134,6 +148,15 @@ class neticaEdge(object):
     def __init__(self):
         pass
     
+class FuncTable(object):
+    
+    def __init__(self, parentColumns, outcomeValues, parentValues):
+        self.parentColumns = parentColumns
+        self.outcomeValues = outcomeValues
+        self.parentValues = parentValues
+        
+        
+
 class ProbsValueTable(object):
     '''
     This class is designed to store a junction table.  A junction
