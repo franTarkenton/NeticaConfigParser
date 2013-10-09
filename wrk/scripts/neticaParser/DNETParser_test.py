@@ -263,6 +263,17 @@ class TestBayesParser(unittest.TestCase):
         parseBayesNet._ParseBayesNet__parseFuncTableMultiLineAttribute(self.multilineFuncTable1)
         
         
+    def test_ParseBayesNet_DataVerification(self):
+        '''
+        Making sure that the parser actually captured the correct infromation
+        from the car_Buyer file.
+        '''
+        self.dnetParser.parseStartEndPoints()
+        self.dnetParser.populateBayesParams()
+        neticaDataStruct = self.dnetParser.
+
+
+        
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
     unittest.main()

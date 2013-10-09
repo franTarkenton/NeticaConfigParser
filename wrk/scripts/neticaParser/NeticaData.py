@@ -43,10 +43,9 @@ class neticaNet(object):
         return self.nodeDict[name]
         
     def getRootNodes(self, recalc=True): 
-        if not rootNodes or recalc:
-            for nodekey in nodeDict.keys():
+        if not self.rootNodes or recalc:
+            for nodekey in self.nodeDict.keys():
                 print nodekey
-         
 
 class neticaNode(object):
     

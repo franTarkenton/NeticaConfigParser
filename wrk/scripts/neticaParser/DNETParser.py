@@ -37,350 +37,349 @@ import sys
 import numpy
 import itertools
 
-class parseDNET(object):
-    inputDnetFile = ''
-    
-    # regular expressions used my class
-    re_comments = None
-    re_startMultiLine = None
-    re_structStartMultiLine = None
-    
-    # variables that are used by objects to help 
-    # with the parsing.
-    prevLine = ''
-    curLine = ''
-    fh = None
-    
-    # used to help with recursive development of the structure.
-    struct = {}
-    structsStartStop = {}
-    curStruct = None
-    prevStruct = None
-    
-    def __init__(self, inputDnetFile):
-        self.inputDnetFile = inputDnetFile
-        self.getStartEndStructs()
-        
-    def getStartEndStructs(self):
-        '''
-        reads through the dnet file looking for parentheses
-        ie  '{' , '}' and records their locations. 
-        '''
-        starts = []
-        defaultstart = [None, None, None, None]
-        ends = []
-        structIndicies = []
-        lineNum = 0
-        fh = open(self.inputDnetFile, 'r')
-        for line in fh:
-            line = line.replace('\n', '')
-            colNum = 0
-            for char in line:
-                if char == '}':
-                    # found the end of a struct
-                    ends.append([lineNum, colNum])
-                    
-                elif char == '{':
-                    # found the start of a struct
-                    starts.append([lineNum, colNum])
-                    tmpLine = defaultstart
-                    structIndicies
-                colNum += 1
-            lineNum += 1
-        print starts
-        print ends
-                
-    def parseLine(self):
-        # only called when the structure is initialised, should only happen once
-        if self.curStruct == None:
-            self.curStruct = self.struct
-        # think about reading the whole thing into memory first! then iterating
-        # through.
-        line = self.fh.readline()
-        if line:
-            # TODO: Need to only strip \n characters from the very end of the line.
-            line = line.replace("\n", "")
-            if self.re_comments.match(line):
-                # a commented out line, skip it!
-                print 'comment: ', line
-                self.parseLine()
-            elif self.re_structStartMultiLine.match(line):
-                # start of a struct, like 'bnet Car_Buyer {'
-                print 'start data sturct:', line
-                type = line.split(' ')[0]
-                name = line.split(' ')[1]
-                self.prevStruct = self.curStruct
-                if not self.curStruct.has_key(type):
-                    self.curStruct[type] = {}
-                if not self.curStruct[type].has_key(name):
-                    self.curStruct[type][name] = {}
-                self.prevStruct = self.curStruct
-                self.curStruct = self.curStruct[type][name]
-                self.parseLine(line)
-            elif self.re_multiLineStringStart.match(line):
-                # detected the start of a multiline string 
-                # entry.  Should now call a different method
-                # that will iterate through the filehandle 
-                # until it gets to the end of the multiline 
-                # string.
-                # TODO: Should move the line parsing to another method so that it can be tested
-                varName = line.split('=')[0].strip()
-                firstLineVal = line.split('=')[1].strip()
-                # remvoe the trailing \ line continuation character
-                # then remove any trailing spaces.
-                firstLineVal = firstLineVal.rstrip(r'\\', ).strip()
-                rest = self.getRestOfMultiLineComments()
-                # append the values together
-                value = firstLineVal + ' ' + rest
-                # enter it into the structure
-                self.curStruct[varName] = value
-            elif self.re_singleLineString.match(line):
-                varName, value = self.singleLineStringParser(line)
-                self.curStruct[varName] = value
-            elif self.re_singleLineProperty.match(line):
-                varName, value = self.singleLineStringParser()
-                self.curStruct[varName] = value
-            elif self.re_singleLineBooleanProperty.match(line):
-                varName, value = self.singleLineStringParser()
-                if value.upper() == 'TRUE':
-                    self.curStruct[varName] = True
-                elif value.upper() == 'FALSE':
-                    self.curStruct[varName] = False
-                else:
-                    msg = 'while iterating through the DNET file came accross ' + \
-                          'this line: (' + str(line) + '). The regular expressions ' + \
-                          'detected it as a boolean value, however it does not ' + \
-                          'contain a true, or false value.'
-                    raise TypeError, msg
-            elif self.re_singleLineNumericProperty(line):
-                varName, value = self.singleLineStringParser()
-                if '.' in value:
-                    self.curStruct[varName] = float(value)
-                else:
-                    self.curStruct[varName] = int(value)
-            elif self.re_singleLineListNumbers.match(line):
-                varName, value = self.singleLineListParser()
-                self.curStruct[varName] = value
-            elif self.re_singleLineListProperties.match(line):
-                # down the road may want to look into putting a 
-                # special flag as these properties reference other
-                # nodes.  Maybe maintain a parent list or something, 
-                # maybe not, we'll see once we start working with it
-                varName, value = self.singleLineListParser()
-                self.curStruct[varName] = value
-            elif self.re_startMultiLineDataStruct.match(line):
-                # once the startline is detected need to:
-                #  a) get the rest of the data into memory
-                #  b) get the 
-                # rest of
-                
-                
-                pass
-            # next is the multiline multidimension data structure!
-            # step1 detect start of a multiline / tabular data struct!
-            #       these tend to start with 'var = ' followed by 
-            #       nothing!
-      
-            
-
-            
-            # list of lists, exeample:
-            # path = ((111, 51), (168, 18), (42,....
-            # end of a struct
-            return
-            
-    def readRestOfMultiLineStruct(self, line):
-        '''
-        multiline data structures look like this:
-        
-            probs = 
-        // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
-        (((1,           0,           0,           0),             // NoTest       Peach 
-          (1,           0,           0,           0)),            // NoTest       Lemon 
-         ((0,           0.9,         0.1,         0),             // Steering     Peach 
-          (0,           0.4,         0.6,         0)),            // Steering     Lemon 
-         ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
-          (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
-         ((0,           0.9,         0.1,         0),             // Transmission Peach 
-          (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
-
-
-        The structure is:
-            probs = (This is the name of the variable or the declaration of the property)
-            // NoResult NoDefects ... // NODE  NODE (describes the order of the states 
-            // ((( 1,0,0,0), // NoTest  Peach (Describes the probability for NoTest Peach combination
-                 ( 1,0,0,0)), // NoTest Lemon (Describes the probaility for NoTest Lemon combination
-                                 the 1 indicates that the result of this combination will always 
-                                 result in a NoResult state.  Lower down (3rd row) the .9 indicates
-                                 a 90% probability for NoDefects when T1= Steering and CC = Peach
-                                 and 10% probability for OneDefect when T1=Steering and CC = Peach
-                 
-        
-        '''
-            
-    def singleLineListParser(self, line):
-        '''
-        recieves a line for the dnet file that contains a 
-        list of values. The input line will look similar to
-        one of the following:
-        
-        parents = (T1, R1)
-        states = (NoTest, Differential)
-        center = (306, 60)
-        
-        This method will return the variable 
-        name as the first arg and a python list as the second.
-        If the list is made up of numbers the method will 
-        handle the type conversions (string to int), and will
-        return a list of numbers.
-        
-        If the list is made up of a list of property names
-        then it will return just that, a list of properties 
-        as strings.
-        '''
-        varName = line.split('=')[0].strip()
-        value = line.split('=')[1].strip()
-        if value[0] == '(':
-            value = value[1:]
-        if value[len(value) - 1] == ')':
-            value = value[0:len(value) - 1]
-        valList = value.split(',')
-        cnt = 0
-        for val in valList:
-            val = val.strip()
-            # is the val a number?
-            if val.isdigit():
-                val = int(val)
-            elif val.replace('.', '').isdigit():
-                val = float(val)
-            valList[cnt] = val
-            cnt += 1
-        # TODO: need to write a test for this method
-        # var = (1,2,3) should return [1,2,3]
-        # var = (once, twice) should return ['once', 'twice')
-        # var = (1.1, 23.23423) should return [1.1, 23.23423]
-        # test should verify the type conversion as well as the 
-        # conversion to the list.
-        return varName, valList
-        
-    def singleLineStringParser(self, line):
-        '''
-        receives a line from a dnet file that contains a single 
-        line string value.  Returns the name of the property that 
-        is being set and the associated value.  The value will have 
-        any carriage returns removed as well as the line termination
-        character ';' leading and trailing spaces and the quotes
-        that surround the value,
-        '''
-        varName = line.split('=')[0].strip()
-        value = line.split('=')[1].strip()
-        # remove the semi colon
-        if value[len(value) - 1] == ';':
-            value = value[0:len(value) - 1]
-        # remove leading and ending " characters
-        value = value.strip('"')
-        return varName, value
-                
-    def getRestOfMultiLineComments(self):
-        values = []  # list that will be returned!
-        breakLoop = False
-        while True:
-            line = self.fh.readline()
-            # only want to remove the carriage return at the end of the line
-            if line[len(line) - 1] == '\n':
-                print 'removing carriage return'
-                line = line[0:len(line) - 1]
-            print 'line:', line
-            if not line:
-                break
-            if self.re_multiLineStringEnd.match(line):
-                breakLoop = True
-            line = line.rstrip(r'\\', ).strip()
-            values.append(line)
-            if breakLoop:
-                break
-        return ' '.join(values)
-        
-    def parse(self):
-        bnet = {}
-        startStructs, endStructs = self.getStructStartEnds()
-        fh = open(self.inputDnetFile, 'r')
-        linecnt = 1
-        struct = {}
-        prevStruct = None
-        started = False
-        for line in fh:
-            line = line.replace("\n", '')
-            print 'line -', line
-            # everything needs to be part of a struct, so 
-            # don't even bother with a line until it indicates 
-            # that its part of the start of a struct
-            if startStructs.count(linecnt) and endStructs.count(linecnt):
-                # single line struct, need to treat a little different
-                # syntax is type{atrib=val; atrib=val; attrib=;}
-                key, singleLineStruct = self.parseSingleLineStruct(line)
-                
-            if startStructs.count(linecnt):
-                started = True
-                # started a struct, now parse it.
-                # is it a one line struct?
-                structName = line.split(' ')[1]
-                print '  structName is: ', structName
-                structType = line.split(' ')[0]
-                prevStruct = struct
-                struct[structName] = {}
-                struct = struct[structName]
-            if endStructs.count(linecnt):
-                # structure ends!
-                pass
-                
-            if started:
-                pass
-                
-            linecnt += 1
-    
-    def parseSingleLineStruct(self, line):
-        
-        # parse a line like
-        # nodefont = font {shape= "Arial"; size= 10;}; 2
-        #
-        # return as a key nodefont and a dictionary 
-        # that lookes like:
-        # dict['font'] = { 'shape':'Arial', 
-        #                  'size': 10 }
-        #
-        line = line.strip()
-        key = line.split('=')[0]
-        # pull out everyting to the right of the first = sign
-        rest = line[line.find('=') + 1:]
-        
-        secondKey = rest[0:rest.find('{')]
-        print 'second key is:', secondKey
-        propertyList = rest[rest.find('{'):]
-        propertyList = propertyList.strip(';')
-        print 'propertyList is:', propertyList
-        #print 
-        rest = line.split('=')[1].replace('{', '').replace('}', '').strip().split(';')
-        print rest
-        
-    def getStructStartEnds(self):
-        fh = open(self.inputDnetFile, 'r')
-        lineNum = 1
-        structStarts = []
-        structEnds = []
-        for line in fh:
-            if line.count('{'):
-                structStarts.append(lineNum)
-            if line.count('}'):
-                structEnds.append(lineNum)
-            lineNum += 1
-        
-        structStarts.sort()
-        structEnds.sort()
-        print 'startKeys:', structStarts, len(structStarts)
-        print 'endKeys:', structEnds, len(structEnds)
-        return structStarts, structEnds
-        
+# class parseDNET(object):
+#     inputDnetFile = ''
+#     
+#     # regular expressions used my class
+#     re_comments = None
+#     re_startMultiLine = None
+#     re_structStartMultiLine = None
+#     
+#     # variables that are used by objects to help 
+#     # with the parsing.
+#     prevLine = ''
+#     curLine = ''
+#     fh = None
+#     
+#     # used to help with recursive development of the structure.
+#     struct = {}
+#     structsStartStop = {}
+#     curStruct = None
+#     prevStruct = None
+#     
+#     def __init__(self, inputDnetFile):
+#         self.inputDnetFile = inputDnetFile
+#         self.getStartEndStructs()
+#         
+#     def getStartEndStructs(self):
+#         '''
+#         reads through the dnet file looking for parentheses
+#         ie  '{' , '}' and records their locations. 
+#         '''
+#         starts = []
+#         defaultstart = [None, None, None, None]
+#         ends = []
+#         structIndicies = []
+#         lineNum = 0
+#         fh = open(self.inputDnetFile, 'r')
+#         for line in fh:
+#             line = line.replace('\n', '')
+#             colNum = 0
+#             for char in line:
+#                 if char == '}':
+#                     # found the end of a struct
+#                     ends.append([lineNum, colNum])
+#                     
+#                 elif char == '{':
+#                     # found the start of a struct
+#                     starts.append([lineNum, colNum])
+#                     structIndicies
+#                 colNum += 1
+#             lineNum += 1
+#         print starts
+#         print ends
+#                 
+#     def parseLine(self):
+#         # only called when the structure is initialised, should only happen once
+#         if self.curStruct == None:
+#             self.curStruct = self.struct
+#         # think about reading the whole thing into memory first! then iterating
+#         # through.
+#         line = self.fh.readline()
+#         if line:
+#             # TODO: Need to only strip \n characters from the very end of the line.
+#             line = line.replace("\n", "")
+#             if self.re_comments.match(line):
+#                 # a commented out line, skip it!
+#                 print 'comment: ', line
+#                 self.parseLine()
+#             elif self.re_structStartMultiLine.match(line):
+#                 # start of a struct, like 'bnet Car_Buyer {'
+#                 print 'start data sturct:', line
+#                 atribType = line.split(' ')[0]
+#                 name = line.split(' ')[1]
+#                 self.prevStruct = self.curStruct
+#                 if not self.curStruct.has_key(atribType):
+#                     self.curStruct[atribType] = {}
+#                 if not self.curStruct[atribType].has_key(name):
+#                     self.curStruct[atribType][name] = {}
+#                 self.prevStruct = self.curStruct
+#                 self.curStruct = self.curStruct[atribType][name]
+#                 self.parseLine(line)
+#             elif self.re_multiLineStringStart.match(line):
+#                 # detected the start of a multiline string 
+#                 # entry.  Should now call a different method
+#                 # that will iterate through the filehandle 
+#                 # until it gets to the end of the multiline 
+#                 # string.
+#                 # TODO: Should move the line parsing to another method so that it can be tested
+#                 varName = line.split('=')[0].strip()
+#                 firstLineVal = line.split('=')[1].strip()
+#                 # remvoe the trailing \ line continuation character
+#                 # then remove any trailing spaces.
+#                 firstLineVal = firstLineVal.rstrip(r'\\', ).strip()
+#                 rest = self.getRestOfMultiLineComments()
+#                 # append the values together
+#                 value = firstLineVal + ' ' + rest
+#                 # enter it into the structure
+#                 self.curStruct[varName] = value
+#             elif self.re_singleLineString.match(line):
+#                 varName, value = self.singleLineStringParser(line)
+#                 self.curStruct[varName] = value
+#             elif self.re_singleLineProperty.match(line):
+#                 varName, value = self.singleLineStringParser()
+#                 self.curStruct[varName] = value
+#             elif self.re_singleLineBooleanProperty.match(line):
+#                 varName, value = self.singleLineStringParser()
+#                 if value.upper() == 'TRUE':
+#                     self.curStruct[varName] = True
+#                 elif value.upper() == 'FALSE':
+#                     self.curStruct[varName] = False
+#                 else:
+#                     msg = 'while iterating through the DNET file came accross ' + \
+#                           'this line: (' + str(line) + '). The regular expressions ' + \
+#                           'detected it as a boolean value, however it does not ' + \
+#                           'contain a true, or false value.'
+#                     raise TypeError, msg
+#             elif self.re_singleLineNumericProperty(line):
+#                 varName, value = self.singleLineStringParser()
+#                 if '.' in value:
+#                     self.curStruct[varName] = float(value)
+#                 else:
+#                     self.curStruct[varName] = int(value)
+#             elif self.re_singleLineListNumbers.match(line):
+#                 varName, value = self.singleLineListParser()
+#                 self.curStruct[varName] = value
+#             elif self.re_singleLineListProperties.match(line):
+#                 # down the road may want to look into putting a 
+#                 # special flag as these properties reference other
+#                 # nodes.  Maybe maintain a parent list or something, 
+#                 # maybe not, we'll see once we start working with it
+#                 varName, value = self.singleLineListParser()
+#                 self.curStruct[varName] = value
+#             elif self.re_startMultiLineDataStruct.match(line):
+#                 # once the startline is detected need to:
+#                 #  a) get the rest of the data into memory
+#                 #  b) get the 
+#                 # rest of
+#                 
+#                 
+#                 pass
+#             # next is the multiline multidimension data structure!
+#             # step1 detect start of a multiline / tabular data struct!
+#             #       these tend to start with 'var = ' followed by 
+#             #       nothing!
+#       
+#             
+# 
+#             
+#             # list of lists, exeample:
+#             # path = ((111, 51), (168, 18), (42,....
+#             # end of a struct
+#             return
+#             
+#     def readRestOfMultiLineStruct(self, line):
+#         '''
+#         multiline data structures look like this:
+#         
+#             probs = 
+#         // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
+#         (((1,           0,           0,           0),             // NoTest       Peach 
+#           (1,           0,           0,           0)),            // NoTest       Lemon 
+#          ((0,           0.9,         0.1,         0),             // Steering     Peach 
+#           (0,           0.4,         0.6,         0)),            // Steering     Lemon 
+#          ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
+#           (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
+#          ((0,           0.9,         0.1,         0),             // Transmission Peach 
+#           (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
+# 
+# 
+#         The structure is:
+#             probs = (This is the name of the variable or the declaration of the property)
+#             // NoResult NoDefects ... // NODE  NODE (describes the order of the states 
+#             // ((( 1,0,0,0), // NoTest  Peach (Describes the probability for NoTest Peach combination
+#                  ( 1,0,0,0)), // NoTest Lemon (Describes the probaility for NoTest Lemon combination
+#                                  the 1 indicates that the result of this combination will always 
+#                                  result in a NoResult state.  Lower down (3rd row) the .9 indicates
+#                                  a 90% probability for NoDefects when T1= Steering and CC = Peach
+#                                  and 10% probability for OneDefect when T1=Steering and CC = Peach
+#                  
+#         
+#         '''
+#             
+#     def singleLineListParser(self, line):
+#         '''
+#         recieves a line for the dnet file that contains a 
+#         list of values. The input line will look similar to
+#         one of the following:
+#         
+#         parents = (T1, R1)
+#         states = (NoTest, Differential)
+#         center = (306, 60)
+#         
+#         This method will return the variable 
+#         name as the first arg and a python list as the second.
+#         If the list is made up of numbers the method will 
+#         handle the type conversions (string to int), and will
+#         return a list of numbers.
+#         
+#         If the list is made up of a list of property names
+#         then it will return just that, a list of properties 
+#         as strings.
+#         '''
+#         varName = line.split('=')[0].strip()
+#         value = line.split('=')[1].strip()
+#         if value[0] == '(':
+#             value = value[1:]
+#         if value[len(value) - 1] == ')':
+#             value = value[0:len(value) - 1]
+#         valList = value.split(',')
+#         cnt = 0
+#         for val in valList:
+#             val = val.strip()
+#             # is the val a number?
+#             if val.isdigit():
+#                 val = int(val)
+#             elif val.replace('.', '').isdigit():
+#                 val = float(val)
+#             valList[cnt] = val
+#             cnt += 1
+#         # TODO: need to write a test for this method
+#         # var = (1,2,3) should return [1,2,3]
+#         # var = (once, twice) should return ['once', 'twice')
+#         # var = (1.1, 23.23423) should return [1.1, 23.23423]
+#         # test should verify the type conversion as well as the 
+#         # conversion to the list.
+#         return varName, valList
+#         
+#     def singleLineStringParser(self, line):
+#         '''
+#         receives a line from a dnet file that contains a single 
+#         line string value.  Returns the name of the property that 
+#         is being set and the associated value.  The value will have 
+#         any carriage returns removed as well as the line termination
+#         character ';' leading and trailing spaces and the quotes
+#         that surround the value,
+#         '''
+#         varName = line.split('=')[0].strip()
+#         value = line.split('=')[1].strip()
+#         # remove the semi colon
+#         if value[len(value) - 1] == ';':
+#             value = value[0:len(value) - 1]
+#         # remove leading and ending " characters
+#         value = value.strip('"')
+#         return varName, value
+#                 
+#     def getRestOfMultiLineComments(self):
+#         values = []  # list that will be returned!
+#         breakLoop = False
+#         while True:
+#             line = self.fh.readline()
+#             # only want to remove the carriage return at the end of the line
+#             if line[len(line) - 1] == '\n':
+#                 print 'removing carriage return'
+#                 line = line[0:len(line) - 1]
+#             print 'line:', line
+#             if not line:
+#                 break
+#             if self.re_multiLineStringEnd.match(line):
+#                 breakLoop = True
+#             line = line.rstrip(r'\\', ).strip()
+#             values.append(line)
+#             if breakLoop:
+#                 break
+#         return ' '.join(values)
+#         
+#     def parse(self):
+#         bnet = {}
+#         startStructs, endStructs = self.getStructStartEnds()
+#         fh = open(self.inputDnetFile, 'r')
+#         linecnt = 1
+#         struct = {}
+#         prevStruct = None
+#         started = False
+#         for line in fh:
+#             line = line.replace("\n", '')
+#             print 'line -', line
+#             # everything needs to be part of a struct, so 
+#             # don't even bother with a line until it indicates 
+#             # that its part of the start of a struct
+#             if startStructs.count(linecnt) and endStructs.count(linecnt):
+#                 # single line struct, need to treat a little different
+#                 # syntax is type{atrib=val; atrib=val; attrib=;}
+#                 key, singleLineStruct = self.parseSingleLineStruct(line)
+#                 
+#             if startStructs.count(linecnt):
+#                 started = True
+#                 # started a struct, now parse it.
+#                 # is it a one line struct?
+#                 structName = line.split(' ')[1]
+#                 print '  structName is: ', structName
+#                 structType = line.split(' ')[0]
+#                 prevStruct = struct
+#                 struct[structName] = {}
+#                 struct = struct[structName]
+#             if endStructs.count(linecnt):
+#                 # structure ends!
+#                 pass
+#                 
+#             if started:
+#                 pass
+#                 
+#             linecnt += 1
+#     
+#     def parseSingleLineStruct(self, line):
+#         
+#         # parse a line like
+#         # nodefont = font {shape= "Arial"; size= 10;}; 2
+#         #
+#         # return as a key nodefont and a dictionary 
+#         # that lookes like:
+#         # dict['font'] = { 'shape':'Arial', 
+#         #                  'size': 10 }
+#         #
+#         line = line.strip()
+#         key = line.split('=')[0]
+#         # pull out everyting to the right of the first = sign
+#         rest = line[line.find('=') + 1:]
+#         
+#         secondKey = rest[0:rest.find('{')]
+#         print 'second key is:', secondKey
+#         propertyList = rest[rest.find('{'):]
+#         propertyList = propertyList.strip(';')
+#         print 'propertyList is:', propertyList
+#         #print 
+#         rest = line.split('=')[1].replace('{', '').replace('}', '').strip().split(';')
+#         print rest
+#         
+#     def getStructStartEnds(self):
+#         fh = open(self.inputDnetFile, 'r')
+#         lineNum = 1
+#         structStarts = []
+#         structEnds = []
+#         for line in fh:
+#             if line.count('{'):
+#                 structStarts.append(lineNum)
+#             if line.count('}'):
+#                 structEnds.append(lineNum)
+#             lineNum += 1
+#         
+#         structStarts.sort()
+#         structEnds.sort()
+#         print 'startKeys:', structStarts, len(structStarts)
+#         print 'endKeys:', structEnds, len(structEnds)
+#         return structStarts, structEnds
+#         
         
 class DNETStructParser():
     '''
@@ -424,8 +423,6 @@ class DNETStructParser():
         return hierarchDataStruct
                     
     def __restruct(self, elemList):
-        struct = self.defaultLine
-        pointer = struct
         curElemCnt = 0
         startElemObj = element()
         curElemObj = startElemObj
@@ -975,10 +972,9 @@ class ParseBayesNet():
         This method parses this into a probability table 
         
         '''
-        type = self.__getAtribType(multiLine)
-        print 'type', type
+        atribType = self.__getAtribType(multiLine)
+        print 'atribType', atribType
         equalPosList = self.__getPositions(multiLine, 'equal')
-        commentPositions = self.__getPositions(multiLine, 'comment')
         atribList1, atribList2 = self.__getAttributeHeaders(multiLine)
         print 'atribList1', atribList1
         print 'atribList2', atribList2
@@ -987,7 +983,6 @@ class ParseBayesNet():
         dataStructString = ''
         arrayType = 'float'
         for oneLine in multiLine.split('\n'):
-            parentInputValuesString = oneLine
             probabilityValues = oneLine
             equalPosList = self.__getPositions(oneLine, 'equal')
             if equalPosList:
@@ -1024,7 +1019,7 @@ class ParseBayesNet():
             print 'newShapeParam', newShapeParam
             print 'len(atribList1)', len(atribList1)
             print 'len(atribList2)', len(atribList2)
-            if type == 'functable':
+            if atribType == 'functable':
                 var = var.reshape(newShapeParam, dim[len(dim) - 1])
             else:
                 var = var.reshape(newShapeParam, len(atribList1))
@@ -1033,7 +1028,7 @@ class ParseBayesNet():
         print var
         return var
     
-    def __getJustValue(self, value, type):
+    def __getJustValue(self, value, atribType):
         '''
         Recieves a value, removes the characters '(', ')', ',', ';' and 
         then tests to see if its a number.  If its not a valid number then
@@ -1045,8 +1040,8 @@ class ParseBayesNet():
         if not self.__is_number(tmpVal) and tmpVal:
             newVal = "'" + tmpVal + "'"
             value = value.replace(tmpVal, newVal)
-            type = 'str'
-        return value, type
+            atribType = 'str'
+        return value, atribType
     
     def __is_number(self, num):
         try:
@@ -1086,7 +1081,7 @@ class ParseBayesNet():
         if all(self.__isNum(v) for v in dataList):
             dataList = [ float(x) for x in dataList ]
         #TODO: should verify that there is only one value and raise an error if not
-        returnDict = dict(zip(columnList, dataList))
+#         returnDict = dict(zip(columnList, dataList))
         
         neticaProbabilityTable = NeticaData.ProbsValueTable(columnList)
         neticaProbabilityTable.setRootValues(dataList)
