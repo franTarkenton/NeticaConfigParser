@@ -20,31 +20,53 @@ import OpenBayes
 class neticaNet(object):
     '''
     This is the actual network.  This object will be composed
-    of Nodes and Edges.
+    of Nodes and Edges.  It contains various methods that should
+    make it easy to extract the necessary information.
+    
+    
+    :ivar name: The name of the Bayes Belief Network
+    :ivar nodeDict: A dictionary that contains all the nodes that 
+                    are members of this network.
+    :ivar rootNodes: Contains all the root nodes, (nodes without 
+                     parents) This object will get populated the 
+                     first time the root nodes are requested.  Then 
+                     subsequent requests will just return the contents
+                     of this list.
     '''
     def __init__(self):
         self.name = None
         self.rootNodes = []
         self.nodeDict = {}
         
-        # nature, decision, utility, constant
-        # 
-        
-        # chance - deterministic probableistic
-        # deterministic - no randomness involved in determining future state
-        # probablistic - likelyhood of something happening.
-        
     def setName(self, name):
+        '''
+        Sets the name of this BBN.
+        
+        :param  name: the name of the BBN
+        :type name: str
+        '''
         self.name = name
         
     def getName(self):
+        '''
+        Returns the name of this BBN.       
+        
+        :returns: The name of the BBN
+        :rtype: str
+        '''
         return self.name
         
     def newNode(self, name):
         '''
-        creates a new node.  Does not attach it to this network, 
-        but does store it in a dictionary that allows it to be 
-        easily retrieved.
+        creates a new node, and assigns it the given name.  The node
+        exists at this point, but it does not contain any information.
+        
+        :param  name: The name of the NeticaNode that is to be created
+                      and added to this network.
+        :type name: str
+        
+        :returns: returns a NeticaNode object that was just created.
+        :rtype: NeticaNode
         '''
         nodeObj = neticaNode()
         nodeObj.setName(name)
@@ -55,10 +77,15 @@ class neticaNet(object):
         '''
         Returns a list of the node names that form the start
         of this network.  In other words the nodes that do 
-        not have any children.
+        not have any parents.
         
-        :param  recalc: param description
-        :type recalc: enter type
+        :param  recalc: If this value is set to be true, then even 
+                        if the rootnodes were previously calculated 
+                        it forces the recalculation of them.  You would
+                        want to do this if you have previously requested
+                        root nodes, and then subsequently added nodes
+                        to the dictionary that may be root nodes.
+        :type recalc: boolean
         '''
         rootNodes = []
         if not self.rootNodes or recalc:
@@ -76,19 +103,41 @@ class neticaNet(object):
         Returns a list of strings that contains the names 
         of all the nodes that make up this network
         
-        :returns: a list of strings, the names of all the nodes that 
-                 make up the netica network
+        :returns: a list of strings that are the names of all the nodes that 
+                 make up the this network.
         :rtype: list(str)
         '''
         return self.nodeDict.keys()
     
     def getNonRootNodeNames(self):
+        '''
+        Returns the name of non root nodes, in other words 
+        returns all the nodes from this network that have parents
+        
+        :returns: a list of strings that contains all the non root nodes 
+                  that make up this network
+        :rtype: list(str)
+        '''
         rootNodeNames = self.getRootNodeNames()
         allNodeNames = self.getAllNodeNames()
         nonRootNodes = [item for item in allNodeNames if item not in rootNodeNames]
         return nonRootNodes
                 
     def getParentNodeNames(self, nodeName):
+        '''
+        Give the name of a node, this method will return a list 
+        of strings containing the names of the parents to this 
+        node.
+        
+        :param  nodeName: the input node who's parent nodes you would
+                          like to retrieve
+        :type nodeName: str
+        
+        :returns: a list of strings that contains the names of the nodes
+                  that are parents of the node provided as an arg to this 
+                  method
+        :rtype: list(str)
+        '''
         retNodes = []
         for nodeKey in self.nodeDict.keys():
             nodeObj = self.nodeDict[nodeKey]
@@ -99,6 +148,18 @@ class neticaNet(object):
         return retNodes
                     
     def getParentNodes(self, nodeName):
+        '''
+        Given the name of a node, this method will return a list of 
+        neticaNode objects that are parents to the node name that was 
+        provided
+        
+        :param  nodeName: The name of the node who's parent node objects 
+                          you want returned
+        :type nodeName: str
+        
+        :returns: a list of neticaNode objects that are going to be returned.
+        :rtype: list(neticaNode)
+        '''
         parentNodeName = self.getParentNodeNames(nodeName)
         retNodes = []
         for parentName in parentNodeName:
@@ -124,15 +185,39 @@ class neticaNet(object):
                      'however there are not any nodes by this name in this network. ' + \
                      'Nodes that exist are: (' + ','.join(self.nodeDict.keys())
             raise ValueError, errMsg
-        return self.nodeDict[name]
-                
-    def printReport(self):
-        '''
-        creates a printout that describes the bayesNet
-        '''
-        pass
+        return self.nodeDict[name]    
 
 class neticaNode(object):
+    '''
+    This class is used to store information about a neticaNode. Most
+    of the properties correspond with the properties that define a 
+    node inside of a dnet file.  Values of various properties
+    get validated using the validation dictionary.
+    
+    If you are wondering about any of the terms described below
+    see the netica glossary.  The terms are all copied directly
+    from the netica dnet file.
+    
+    :ivar chance: Identifies if the node is "Deterministic" or "Nature"
+                  meaning its value can only be inferred as a probability 
+                  distribution over possible values. 
+    :ivar discrete: Boolean value that identifies if a node
+                    is discrete or not.
+    :ivar funcTable: if the node contains a function table 
+                     this is the property that it will get 
+                     stored in.!
+    :ivar kind: one of the following values:
+               ['NATURE', 'DECISION', 'UTILITY', 'CONSTANT']!
+    :ivar logger: The logging object
+    :ivar name: The nodes name
+    :ivar parents: a list of the parent node names
+    :ivar probabilityTable: Contains a ProbsValueTable
+                            object.
+    :ivar states: a list of values containing the possible
+                  states that the node can assume.
+    :ivar validationDict: a dictionary that is used to verify most
+                          most of the properties described above.
+    '''
     
     logger = None
     
@@ -148,9 +233,12 @@ class neticaNode(object):
         self.funcTable = None
         self.discrete = None # True or False
         
-        self.validationDict = self.getValidationDict()
+        self.validationDict = self.__getValidationDict()
     
     def __initLogging(self):
+        '''
+        sets up logging for this class.
+        '''
         # This code is here just cause I like to have my log messages contain
         # Module.Class.Function for each message.  If you don't care too much about what 
         # you log messages look like in the log file, you can bypass this.
@@ -191,7 +279,7 @@ class neticaNode(object):
         '''
         return self.states
         
-    def getValidationDict(self):
+    def __getValidationDict(self):
         '''
         returns a dictionary that contains the information used to 
         validate valid attributes of this object.  If the corresponding
@@ -202,14 +290,14 @@ class neticaNode(object):
         '''
         validationDict = {'name': None, 
                           'states': None, 
-                          'kind': ['nature', 'decision', 'utility', 'constant'], 
-                          'chance': ['determin', 'chance'], 
+                          'kind': ['NATURE', 'DECISION', 'UTILITY', 'CONSTANT'], 
+                          'chance': ['DETERMIN', 'CHANCE'], 
                           'parents': None, 
                           'probs': None, 
                           'discrete': [True, False],
                           'title': None, 
                           'functable': None,
-                          'measure':['ratio', 'nominal', 'local', 'ordinal', 'interval']}
+                          'measure':['RATIO', 'NOMINAL', 'LOCAL', 'ORDINAL', 'INTERVAL']}
         return validationDict
         
     def setProbabilityTable(self, neticaProbabilityTable):
@@ -218,10 +306,13 @@ class neticaNode(object):
         probs attribute
         '''
         self.probabilityTable = neticaProbabilityTable
+        self.logger.debug("node name is: " + str(self.name))
         self.logger.debug("prob table: " + str(neticaProbabilityTable))
+        self.logger.debug("likelyhoods in the table are: " + str(neticaProbabilityTable.getLikelyHoodTable()))
       
     def getProbabilityTable(self):
-        if not self.probabilityTable:
+        print 'kind', self.kind
+        if not self.probabilityTable and self.kind.upper() <> 'UTILITY':
             warnMsg = 'There is no probability table for the node "' + \
                       str(self.name) + '" Going to create one with ' + \
                       'equal probabilities for each entry '
@@ -244,8 +335,9 @@ class neticaNode(object):
         self.logger.debug('func table is: ' + str(funcTable))
     
     def enterAndValidateSimpleAttribute(self, property, value):
-        property = property.lower()
-        value = value.lower()
+        
+        #property = property.lower()
+        #value = value.lower()
         valueIsList = False
         #print 'property'.upper(), ' = ', str(property)
         #print 'value'.upper(), ' = ', str(value)
@@ -259,7 +351,8 @@ class neticaNode(object):
                   ','.join(self.validationDict.keys()) 
             raise ValueError, msg
         else:
-            validTypes = self.validationDict[property.lower()]
+            #validTypes = self.validationDict[property.lower()]
+            validTypes = self.validationDict[property]
             if validTypes:
                 # doing type conversion of the value if the property
                 # contains boolean values
@@ -270,7 +363,8 @@ class neticaNode(object):
                         value = True
                     elif value.lower() == 'false':
                         value = False
-                if value not in self.validationDict[property.lower()]:
+                #if value not in self.validationDict[property.lower()]:
+                if value not in self.validationDict[property]:
                     msg = 'Trying to populate the property: (' + str(property) + \
                           ') with the value: (' + str(value) + ').  Unfortunatly ' +\
                           'this is not a valid value for this property!  ' + \
@@ -402,7 +496,6 @@ class ProbsValueTable(object):
         
     def getLikelyHoodTable(self):
 #         if not self.valueStruct:
-            
         return self.valueStruct
     
     def getParentValuesTable(self):
@@ -472,6 +565,19 @@ class netica2OpenBayes(object):
     This class provides the glue between the neticaNet class and the 
     data that will be stored in that object and the movement of that
     data out of that object into the openBayes bbn classes.
+    
+    :ivar OpenBayesNetwork: This is an OpenBayes.BNet object.  When 
+                            the loadData method is complete it should contain
+                            the information that was described in the NeticaNet 
+                            object that was provided to the constructor.
+    :ivar OpenBayesNodesDict: This is a dictionary that contains references to all
+                              the various netica verticies.  Makes it easier to 
+                              populate them with information by storing them in 
+                              this dictionary.
+    :ivar logger: The logging object.  Where log messages should be written to.
+    :ivar neticaNetwork: The neticaNet object that contains the bayes network 
+                         information.  The information contains in this object
+                         will be extracted and entered into the openbayes object
     '''
     
     def __init__(self, neticaNetObj):
@@ -481,6 +587,9 @@ class netica2OpenBayes(object):
         self.OpenBayesNodesDict = {}
         
     def __initLogging(self):
+        '''
+        setting up the logging environement for the method.
+        '''
         # This code is here just cause I like to have my log messages contain
         # Module.Class.Function for each message.  If you don't care too much about what 
         # you log messages look like in the log file, you can bypass this.
@@ -491,8 +600,12 @@ class netica2OpenBayes(object):
         # and this line creates a log message
         self.logger = logging.getLogger(logName)
 
-        
     def loadData(self):
+        '''
+        This method will extrac the information out of the neticaNet object
+        and create an OpenBayes Bayes net object.  To retrieve the openbayes
+        object use the method getOpenBayesNetwork(
+        '''
         self.__createNetwork()
         self.__loadVerticies()
         self.__loadEdges()
@@ -509,6 +622,8 @@ class netica2OpenBayes(object):
                 
         Step 2. 
         '''
+        # entering distributions for root nodes is different than
+        # how you enter nodes that have parents.
         for rootNodeName in self.neticaNetwork.getRootNodeNames():
             self.logger.debug("RootNodeName: " + str(rootNodeName))
             neticaNode = self.neticaNetwork.getNode(rootNodeName)
@@ -523,24 +638,131 @@ class netica2OpenBayes(object):
             openBayesVertex = self.OpenBayesNodesDict[rootNodeName]
             openBayesVertex.setDistributionParameters(likelyHoodTable)
         
-        for nodeName in self.neticaNetwork.getNonRootNodeNames():
-            neticaNode = self.neticaNetwork.getNode(rootNodeName)
+        # Entering the distribution tables for non root nodes.
+        nonRootNodeNames = self.neticaNetwork.getNonRootNodeNames()
+        print 'nonRootNodeNames:', nonRootNodeNames
+        for nodeName in nonRootNodeNames:
+            neticaNode = self.neticaNetwork.getNode(nodeName)
             openBayesVertex = self.OpenBayesNodesDict[nodeName]
             parentLookup = self.__assembleParentLookup(neticaNode)
             parentNames = neticaNode.getParentNames()
             probTab = neticaNode.getProbabilityTable()
-            likelyhoods = probTab.getLikelyHoodTable()
-            parentValues = probTab.getParentValuesTable()
-            distributionDict = {}
-            for parentName in parentNames:
+            if probTab:
+                likelyhoods = probTab.getLikelyHoodTable()
+                parentValues = probTab.getParentValuesTable()
                 
-                openBayesVertex.distribution[{}]
+            else:
+                likelyhoods = None
+                parentValues = None
+#             print 'nodeName', nodeName
+#             print 'parentNames', parentNames
+#             print 'likelyhoods', likelyhoods
+#             print 'parentValues', parentValues
+#             print 'lut:', parentLookup
+            if parentValues and likelyhoods:
+                counter = 0
+                for parentList in parentValues:
+                    parentValCnter = 0
+                    dictRef = parentLookup
+                    dict2Make = {}
+                    for parentVal in parentList:
+                        #print 'parentVal:', parentVal
+                        #print 'srcColumn:', parentNames[parentValCnter]
+                        #print 'position:', parentLookup[ parentNames[parentValCnter]][parentVal]
+                        dict2Make[parentNames[parentValCnter]] = parentLookup[ parentNames[parentValCnter]][parentVal]
+                        #dictRef = dictRef[parentVal]
+                        parentValCnter += 1
+                    print 'dict2Make', dict2Make, likelyhoods[counter]
+                    #print 'position:', dictRef
+                    #print 'likelyhood', likelyhoods[counter][dictRef]
+                    
+                    # now enter into openbayes node
+                    openBayesVertex.distribution[dict2Make] = likelyhoods[counter]
+                    counter += 1
+            '''
+            Entering distributions for nodes/verticies that have them.  Netica supports
+            decision nodes / utility nodes.  For these types of entries if there are no 
+            parents then assume an equal distribution accross the possbile states.  
             
-        
-        for nodeName in self.OpenBayesNodesDict.keys():
-            neticaNode = self.neticaNetwork.getNode(nodeName)
-                        
+            If has parents, I think its just ignored.  Entered as a vertex in openbayes
+            but no probabilities are assigned.  I think openbayes will autocalculate them
+            for us?  Not sure though?
+            
+            the networks that are being modelled for cumulative effects are unlikely to 
+            have decision nodes.
+            
+            
+            '''
+            print 'hi'
+             
     def __assembleParentLookup(self, neticaNode):
+        '''
+        The neticaNet object is made up of nodes.  Nodes contain probability
+        tables (ProbsValueTable).  The probability tables are made up of two
+        lists of information:
+        
+        The first is 2d list containing the likelyhoods of the various states
+        that the node can be in, given various values from the parent nodes.
+        example:
+        
+        [[1.0, 0.0, 0.0, 0.0],
+         [1.0, 0.0, 0.0, 0.0],
+         [0.0, 0.9, 0.1, 0.0],
+         [0.0, 0.4, 0.6, 0.0],
+         [0.0, 0.8, 0.2, 0.0],
+         [0.0, 0.1333333, 0.5333334, 0.3333333],
+         [0.0, 0.9, 0.1, 0.0],
+         [0.0, 0.4, 0.6, 0.0]]
+        
+        The second is a 2d list containing the parent values. example:
+        
+        [['NoTest', 'Peach'], 
+         ['NoTest', 'Lemon'], 
+         ['Steering', 'Peach'], 
+         ['Steering', 'Lemon'], 
+         ['Fuel_Elect', 'Peach'], 
+         ['Fuel_Elect', 'Lemon'], 
+         ['Transmission', 'Peach'], 
+         ['Transmission', 'Lemon']]
+        
+        Probability tables also have a property called parentColumns,
+        example:
+        
+        [T1, CC]
+        
+        And finally there are the states associated with the node:
+        [NoResult, NoDefects, OneDefect, TwoDefects]
+        
+        So putting this together the first element in the likelyhood table:
+        [1.0, 0.0, 0.0, 0.0] and the first element in the parent value
+        table ['NoTest', 'Peach'] tells us there is a 100% likelyhood that this
+        nodes state is equal to NoResult if the parent T1 is equal to 'NoTest',
+        and the parent CC is equal to 'Peach'
+        
+        So to get this information into the openBayes framework we need to
+        forget about the actual values comming from the parents and instead 
+        figure out what the position of that value is in the state property of
+        that node.  
+        
+        This object will construct a dictionary.  The first value of the dictionary
+        is the name of the parent, the second element is the possible value from the
+        parent, and the value that is associated with the name of the parent and
+        the possible state value is the index positon of that state.
+        
+        Thus given the parent 'CC' and the state 'Lemon' the dictionary should 
+        have a value of 1.   
+        
+        This dictionary makes it easy to put assemble the probability tables 
+        into the openbayes framework.
+        
+        :param  neticaNode: the neticaNode object that we want to extract the probability
+                            information from.
+        :type neticaNode: neticaNode
+        
+        :returns: a python dictionary that can be used as a lookup to figure out a 
+                  states index position given its parent and the state value.
+        :rtype: python dictionary
+        '''
         lut = {}
         parentNames = neticaNode.getParentNames()
         for parentName in parentNames:
@@ -556,8 +778,11 @@ class netica2OpenBayes(object):
                
     def __loadEdges(self):
         '''
-        spiders its way through the nodes adding the 
+        spiders its way through the netica nodes adding the 
         connections / relationships between nodes (edges)
+        
+        Uses the nodes parent property to determine what nodes
+        / verticies the edge should connect.
         '''
         nodeNames = self.neticaNetwork.getRootNodeNames()
         self.logger.debug("nodeNames: " + str(nodeNames))
@@ -573,9 +798,9 @@ class netica2OpenBayes(object):
         
     def __loadVerticies(self):
         '''
-        Iterates through the nodes contained by the 
-        netica network object and creates OpenBayes 
-        network nodes
+        Iterates through the nodes that have been extract from the 
+        netica network object and creates OpenBayes network nodes 
+        from that information.
         '''
         for nodeName in self.neticaNetwork.getAllNodeNames():
             nodeObj = self.neticaNetwork.getNode(nodeName)
@@ -589,8 +814,24 @@ class netica2OpenBayes(object):
             self.logger.debug("isDiscrete: " + str(isDiscrete) )
             openBayesVertex = OpenBayes.BVertex(nodeName, isDiscrete, states)
             self.OpenBayesNodesDict[nodeName] = self.OpenBayesNetwork.add_v(openBayesVertex)
+    
+    def getOpenBayesNetwork(self):
+        '''
+        Returns an openbayes network object.  This is an bayesian
+        belief network object that is derived from the patched version of
+        the OpenBayes library which is available here:
         
+        https://github.com/abyssknight/OpenBayes-Fork
         
+        You likely want to run the loadData method first as that 
+        method will populate the openbayes library with the information 
+        contained in the DNET netica file.
+               
+        :returns: an OpenBayes BBN object
+        :rtype: OpenBayes.BNet
+        '''
+        return self.OpenBayesNetwork
+    
     def __createNetwork(self):
         '''
         Extracts the network name from the neticaNetwork 

@@ -590,6 +590,8 @@ class ParseBayesNet():
         parentValues = self.__getParentValuesFromProbsTable(multiLine)
         # now enter these values into a probability table
         neticaProbsTable.setValues(probTable, parentValues)
+        self.logger.debug("probTable: " + str(probTable))
+        self.logger.debug("parentValues: " + str(parentValues))
         return neticaProbsTable
         
     def __getParentValuesFromTable(self, multiLine, numberOfHeaderComments=2):
