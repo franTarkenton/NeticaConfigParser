@@ -268,18 +268,21 @@ class TestBayesParser(unittest.TestCase):
         Making sure that the parser actually captured the correct infromation
         from the car_Buyer file.
         '''
+        print 'over here!'
         self.dnetParser.parseStartEndPoints()
-        self.dnetParser.populateBayesParams()
-        neticaDataStruct = self.dnetParser.
+        bayesParser = self.dnetParser.populateBayesParams()
+        neticaDataStruct = bayesParser.getBayesDataObj()
+        neticaDataStruct.getRootNodeNames()
+        
 
 
         
 if __name__ == "__main__":
     #import sys;sys.argv = ['', 'Test.testName']
-    unittest.main()
+    #unittest.main()
     
     # run a single test
         # run selected tests that are added using addTest
-#     testSuite = unittest.TestSuite()
-#     testSuite.addTest(TestBayesParser('test_ParseBayesNet__parseFuncTableMultiLineAttribute'))
-#     unittest.TextTestRunner(verbosity=2).run(testSuite)
+    testSuite = unittest.TestSuite()
+    testSuite.addTest(TestBayesParser('test_ParseBayesNet__getNeticaProbabilityObject'))
+    unittest.TextTestRunner(verbosity=2).run(testSuite)

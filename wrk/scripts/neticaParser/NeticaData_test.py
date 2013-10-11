@@ -6,6 +6,7 @@ Created on Oct 4, 2013
 import unittest
 import os.path
 import DNETParser
+import NeticaData
 
 
 class NeticaDataTest(unittest.TestCase):
@@ -16,15 +17,17 @@ class NeticaDataTest(unittest.TestCase):
         inFile = os.path.join(dataDir, 'Car_Buyer.dnet.txt')
         self.parser = DNETParser.DNETStructParser(inFile)
         self.parser.parseStartEndPoints()
-        self.parser.populateBayesParams()
-        self.neticaObj = self.parser.getBayesDataObj()
+        self.neticaParser = self.parser.populateBayesParams()
+        self.neticaObj = self.neticaParser.getBayesDataObj()
 
     def tearDown(self):
         pass
 
 
     def test_getRootNodes(self):
-        self.neticaObj.getRootNodes()
+        self.neticaObj.getRootNodeNames()
+        neticaLoader = NeticaData.netica2OpenBayes(self.neticaObj)
+        neticaLoader.loadData()
 
 
 if __name__ == "__main__":

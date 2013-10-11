@@ -30,381 +30,123 @@ API DOC:
 ===============     
 """
 
-from neticaParser import NeticaData
+import datetime
+import getpass
+import inspect
+import logging
 import os.path
 import re
 import sys
-import numpy
-import itertools
+import warnings
 
-# class parseDNET(object):
-#     inputDnetFile = ''
-#     
-#     # regular expressions used my class
-#     re_comments = None
-#     re_startMultiLine = None
-#     re_structStartMultiLine = None
-#     
-#     # variables that are used by objects to help 
-#     # with the parsing.
-#     prevLine = ''
-#     curLine = ''
-#     fh = None
-#     
-#     # used to help with recursive development of the structure.
-#     struct = {}
-#     structsStartStop = {}
-#     curStruct = None
-#     prevStruct = None
-#     
-#     def __init__(self, inputDnetFile):
-#         self.inputDnetFile = inputDnetFile
-#         self.getStartEndStructs()
-#         
-#     def getStartEndStructs(self):
-#         '''
-#         reads through the dnet file looking for parentheses
-#         ie  '{' , '}' and records their locations. 
-#         '''
-#         starts = []
-#         defaultstart = [None, None, None, None]
-#         ends = []
-#         structIndicies = []
-#         lineNum = 0
-#         fh = open(self.inputDnetFile, 'r')
-#         for line in fh:
-#             line = line.replace('\n', '')
-#             colNum = 0
-#             for char in line:
-#                 if char == '}':
-#                     # found the end of a struct
-#                     ends.append([lineNum, colNum])
-#                     
-#                 elif char == '{':
-#                     # found the start of a struct
-#                     starts.append([lineNum, colNum])
-#                     structIndicies
-#                 colNum += 1
-#             lineNum += 1
-#         print starts
-#         print ends
-#                 
-#     def parseLine(self):
-#         # only called when the structure is initialised, should only happen once
-#         if self.curStruct == None:
-#             self.curStruct = self.struct
-#         # think about reading the whole thing into memory first! then iterating
-#         # through.
-#         line = self.fh.readline()
-#         if line:
-#             # TODO: Need to only strip \n characters from the very end of the line.
-#             line = line.replace("\n", "")
-#             if self.re_comments.match(line):
-#                 # a commented out line, skip it!
-#                 print 'comment: ', line
-#                 self.parseLine()
-#             elif self.re_structStartMultiLine.match(line):
-#                 # start of a struct, like 'bnet Car_Buyer {'
-#                 print 'start data sturct:', line
-#                 atribType = line.split(' ')[0]
-#                 name = line.split(' ')[1]
-#                 self.prevStruct = self.curStruct
-#                 if not self.curStruct.has_key(atribType):
-#                     self.curStruct[atribType] = {}
-#                 if not self.curStruct[atribType].has_key(name):
-#                     self.curStruct[atribType][name] = {}
-#                 self.prevStruct = self.curStruct
-#                 self.curStruct = self.curStruct[atribType][name]
-#                 self.parseLine(line)
-#             elif self.re_multiLineStringStart.match(line):
-#                 # detected the start of a multiline string 
-#                 # entry.  Should now call a different method
-#                 # that will iterate through the filehandle 
-#                 # until it gets to the end of the multiline 
-#                 # string.
-#                 # TODO: Should move the line parsing to another method so that it can be tested
-#                 varName = line.split('=')[0].strip()
-#                 firstLineVal = line.split('=')[1].strip()
-#                 # remvoe the trailing \ line continuation character
-#                 # then remove any trailing spaces.
-#                 firstLineVal = firstLineVal.rstrip(r'\\', ).strip()
-#                 rest = self.getRestOfMultiLineComments()
-#                 # append the values together
-#                 value = firstLineVal + ' ' + rest
-#                 # enter it into the structure
-#                 self.curStruct[varName] = value
-#             elif self.re_singleLineString.match(line):
-#                 varName, value = self.singleLineStringParser(line)
-#                 self.curStruct[varName] = value
-#             elif self.re_singleLineProperty.match(line):
-#                 varName, value = self.singleLineStringParser()
-#                 self.curStruct[varName] = value
-#             elif self.re_singleLineBooleanProperty.match(line):
-#                 varName, value = self.singleLineStringParser()
-#                 if value.upper() == 'TRUE':
-#                     self.curStruct[varName] = True
-#                 elif value.upper() == 'FALSE':
-#                     self.curStruct[varName] = False
-#                 else:
-#                     msg = 'while iterating through the DNET file came accross ' + \
-#                           'this line: (' + str(line) + '). The regular expressions ' + \
-#                           'detected it as a boolean value, however it does not ' + \
-#                           'contain a true, or false value.'
-#                     raise TypeError, msg
-#             elif self.re_singleLineNumericProperty(line):
-#                 varName, value = self.singleLineStringParser()
-#                 if '.' in value:
-#                     self.curStruct[varName] = float(value)
-#                 else:
-#                     self.curStruct[varName] = int(value)
-#             elif self.re_singleLineListNumbers.match(line):
-#                 varName, value = self.singleLineListParser()
-#                 self.curStruct[varName] = value
-#             elif self.re_singleLineListProperties.match(line):
-#                 # down the road may want to look into putting a 
-#                 # special flag as these properties reference other
-#                 # nodes.  Maybe maintain a parent list or something, 
-#                 # maybe not, we'll see once we start working with it
-#                 varName, value = self.singleLineListParser()
-#                 self.curStruct[varName] = value
-#             elif self.re_startMultiLineDataStruct.match(line):
-#                 # once the startline is detected need to:
-#                 #  a) get the rest of the data into memory
-#                 #  b) get the 
-#                 # rest of
-#                 
-#                 
-#                 pass
-#             # next is the multiline multidimension data structure!
-#             # step1 detect start of a multiline / tabular data struct!
-#             #       these tend to start with 'var = ' followed by 
-#             #       nothing!
-#       
-#             
-# 
-#             
-#             # list of lists, exeample:
-#             # path = ((111, 51), (168, 18), (42,....
-#             # end of a struct
-#             return
-#             
-#     def readRestOfMultiLineStruct(self, line):
-#         '''
-#         multiline data structures look like this:
-#         
-#             probs = 
-#         // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    
-#         (((1,           0,           0,           0),             // NoTest       Peach 
-#           (1,           0,           0,           0)),            // NoTest       Lemon 
-#          ((0,           0.9,         0.1,         0),             // Steering     Peach 
-#           (0,           0.4,         0.6,         0)),            // Steering     Lemon 
-#          ((0,           0.8,         0.2,         0),             // Fuel_Elect   Peach 
-#           (0,           0.1333333,   0.5333334,   0.3333333)),    // Fuel_Elect   Lemon 
-#          ((0,           0.9,         0.1,         0),             // Transmission Peach 
-#           (0,           0.4,         0.6,         0)));           // Transmission Lemon ;
-# 
-# 
-#         The structure is:
-#             probs = (This is the name of the variable or the declaration of the property)
-#             // NoResult NoDefects ... // NODE  NODE (describes the order of the states 
-#             // ((( 1,0,0,0), // NoTest  Peach (Describes the probability for NoTest Peach combination
-#                  ( 1,0,0,0)), // NoTest Lemon (Describes the probaility for NoTest Lemon combination
-#                                  the 1 indicates that the result of this combination will always 
-#                                  result in a NoResult state.  Lower down (3rd row) the .9 indicates
-#                                  a 90% probability for NoDefects when T1= Steering and CC = Peach
-#                                  and 10% probability for OneDefect when T1=Steering and CC = Peach
-#                  
-#         
-#         '''
-#             
-#     def singleLineListParser(self, line):
-#         '''
-#         recieves a line for the dnet file that contains a 
-#         list of values. The input line will look similar to
-#         one of the following:
-#         
-#         parents = (T1, R1)
-#         states = (NoTest, Differential)
-#         center = (306, 60)
-#         
-#         This method will return the variable 
-#         name as the first arg and a python list as the second.
-#         If the list is made up of numbers the method will 
-#         handle the type conversions (string to int), and will
-#         return a list of numbers.
-#         
-#         If the list is made up of a list of property names
-#         then it will return just that, a list of properties 
-#         as strings.
-#         '''
-#         varName = line.split('=')[0].strip()
-#         value = line.split('=')[1].strip()
-#         if value[0] == '(':
-#             value = value[1:]
-#         if value[len(value) - 1] == ')':
-#             value = value[0:len(value) - 1]
-#         valList = value.split(',')
-#         cnt = 0
-#         for val in valList:
-#             val = val.strip()
-#             # is the val a number?
-#             if val.isdigit():
-#                 val = int(val)
-#             elif val.replace('.', '').isdigit():
-#                 val = float(val)
-#             valList[cnt] = val
-#             cnt += 1
-#         # TODO: need to write a test for this method
-#         # var = (1,2,3) should return [1,2,3]
-#         # var = (once, twice) should return ['once', 'twice')
-#         # var = (1.1, 23.23423) should return [1.1, 23.23423]
-#         # test should verify the type conversion as well as the 
-#         # conversion to the list.
-#         return varName, valList
-#         
-#     def singleLineStringParser(self, line):
-#         '''
-#         receives a line from a dnet file that contains a single 
-#         line string value.  Returns the name of the property that 
-#         is being set and the associated value.  The value will have 
-#         any carriage returns removed as well as the line termination
-#         character ';' leading and trailing spaces and the quotes
-#         that surround the value,
-#         '''
-#         varName = line.split('=')[0].strip()
-#         value = line.split('=')[1].strip()
-#         # remove the semi colon
-#         if value[len(value) - 1] == ';':
-#             value = value[0:len(value) - 1]
-#         # remove leading and ending " characters
-#         value = value.strip('"')
-#         return varName, value
-#                 
-#     def getRestOfMultiLineComments(self):
-#         values = []  # list that will be returned!
-#         breakLoop = False
-#         while True:
-#             line = self.fh.readline()
-#             # only want to remove the carriage return at the end of the line
-#             if line[len(line) - 1] == '\n':
-#                 print 'removing carriage return'
-#                 line = line[0:len(line) - 1]
-#             print 'line:', line
-#             if not line:
-#                 break
-#             if self.re_multiLineStringEnd.match(line):
-#                 breakLoop = True
-#             line = line.rstrip(r'\\', ).strip()
-#             values.append(line)
-#             if breakLoop:
-#                 break
-#         return ' '.join(values)
-#         
-#     def parse(self):
-#         bnet = {}
-#         startStructs, endStructs = self.getStructStartEnds()
-#         fh = open(self.inputDnetFile, 'r')
-#         linecnt = 1
-#         struct = {}
-#         prevStruct = None
-#         started = False
-#         for line in fh:
-#             line = line.replace("\n", '')
-#             print 'line -', line
-#             # everything needs to be part of a struct, so 
-#             # don't even bother with a line until it indicates 
-#             # that its part of the start of a struct
-#             if startStructs.count(linecnt) and endStructs.count(linecnt):
-#                 # single line struct, need to treat a little different
-#                 # syntax is type{atrib=val; atrib=val; attrib=;}
-#                 key, singleLineStruct = self.parseSingleLineStruct(line)
-#                 
-#             if startStructs.count(linecnt):
-#                 started = True
-#                 # started a struct, now parse it.
-#                 # is it a one line struct?
-#                 structName = line.split(' ')[1]
-#                 print '  structName is: ', structName
-#                 structType = line.split(' ')[0]
-#                 prevStruct = struct
-#                 struct[structName] = {}
-#                 struct = struct[structName]
-#             if endStructs.count(linecnt):
-#                 # structure ends!
-#                 pass
-#                 
-#             if started:
-#                 pass
-#                 
-#             linecnt += 1
-#     
-#     def parseSingleLineStruct(self, line):
-#         
-#         # parse a line like
-#         # nodefont = font {shape= "Arial"; size= 10;}; 2
-#         #
-#         # return as a key nodefont and a dictionary 
-#         # that lookes like:
-#         # dict['font'] = { 'shape':'Arial', 
-#         #                  'size': 10 }
-#         #
-#         line = line.strip()
-#         key = line.split('=')[0]
-#         # pull out everyting to the right of the first = sign
-#         rest = line[line.find('=') + 1:]
-#         
-#         secondKey = rest[0:rest.find('{')]
-#         print 'second key is:', secondKey
-#         propertyList = rest[rest.find('{'):]
-#         propertyList = propertyList.strip(';')
-#         print 'propertyList is:', propertyList
-#         #print 
-#         rest = line.split('=')[1].replace('{', '').replace('}', '').strip().split(';')
-#         print rest
-#         
-#     def getStructStartEnds(self):
-#         fh = open(self.inputDnetFile, 'r')
-#         lineNum = 1
-#         structStarts = []
-#         structEnds = []
-#         for line in fh:
-#             if line.count('{'):
-#                 structStarts.append(lineNum)
-#             if line.count('}'):
-#                 structEnds.append(lineNum)
-#             lineNum += 1
-#         
-#         structStarts.sort()
-#         structEnds.sort()
-#         print 'startKeys:', structStarts, len(structStarts)
-#         print 'endKeys:', structEnds, len(structEnds)
-#         return structStarts, structEnds
-#         
-        
+import numpy
+
+from neticaParser import NeticaData
+
 class DNETStructParser():
     '''
     This class contains the methods necessary to parse out the 
     start and stop points of netica's nested data structures.
+    
+    Only deals with puttign together the data structures that describe
+    the start and end points.  Actual parsing of the data is handled
+    by a different class.
+    
+    
+    :ivar defaultLine: Hmm, can't remember what the hell this is!  Likely
+                       its fluff.
+    :ivar dnetFile: String variable that contains the path to the dnet
+                    file that is being parsed.
+    :ivar endChar: This is the character that is used by the parser to 
+                   describe the end of a structure. (used in parsing multi
+                   line objects)
+    :ivar fh: The filehandle that points to the dnetFile
+    :ivar lineCnt: A counter that keeps track fo the current line
+    :ivar startChar: The character that is used to describe the start of a
+                     data structure. (used to parse multiline objects)
+    :ivar struct:  __restruct will populate this parameter with 
+                             an element object.  The element object describes
+                             the start and end points of the various objects
+                             described in the dnet file.  Element objects
+                             are hierarchical.  In that all elements are
+                             parents of a root element.  The root element
+                             will contain the network.  children of that 
+                             element will contain the nodes, etc.
     '''
     lineCnt = 1
     defaultLine = [None, None, None, None, []]
     struct = None
-    hierarchDataStruct = None
     
     startChar = '{'
     endChar = '}'
     
+    logFile = ''
+    logObj = None
+    
     def __init__(self, dnetFile):
         self.dnetFile = dnetFile
+        self.__initLog()
     
     def parseStartEndPoints(self):
+        '''
+        Opens the netica dnet file that was specified by the the 
+        constructor.  Reps through it populating the property struct
+        with information about the start and end points of nodes that
+        are described in the dnet file.
+        
+        The struct propert
+        '''
+        self.logObj.debug("opening the dnet file")
         self.fh = open(self.dnetFile, 'r')
-        self.struct = self.__parseStructs(self.struct, None)
+        self.__parseStructs(self.struct, None)
+        #print 'self.struct', self.struct
         self.fh.close()
+        
+    def __initLog(self):
+        '''
+        This method will inialize a log file.  If the T:\ drive exists
+        then it will automatically put the log file there.  If it does not 
+        exist then it will put it in the directory that the TEMP var is 
+        pointing to.
+        '''
+        # Calculating the log file name
+        defaultLocation = 'T:\\'
+        s = inspect.stack()
+        module_name = inspect.getmodulename(s[1][1])
+        user = getpass.getuser()
+        timeString = datetime.datetime.now().strftime("%a%b%d%H%M%S")
+        logFile = module_name + '_' + user + '_' + timeString + '.log'
+        if os.path.exists(defaultLocation):
+            self.logFile = os.path.join(defaultLocation, logFile)
+        else:
+            self.logFile = os.path.join(os.environ['TEMP'], logFile)
+        # create the log object
+        self.logObj = logging.getLogger()
+        # create a handler
+        hndlr = logging.FileHandler(self.logFile)
+        # creating a formatter and applying formatting to the formatter 
+        formatString = '%(asctime)s %(name)s.%(funcName)s.%(lineno)d %(levelname)s: %(message)s'
+        formatr = logging.Formatter( formatString )
+        formatr.datefmt = '%m-%d-%Y %H:%M:%S' # set up the date format for log messages
+        # apply to formatter to the handler
+        hndlr.setFormatter(formatr)
+        # Step 5 - tell the log object to use the handler
+        self.logObj.addHandler(hndlr)
+        # Step 6 - set the log level
+        self.logObj.setLevel(logging.DEBUG)
+        # Step 7 - create a logging object that this module will use to write its log messages to
+        #             the name of the log object will be moduleName.className
+        logName = module_name + '.' + self.__class__.__name__
+        #print 'logName', logName
+        self.logObj = logging.getLogger( logName )
+        
+        # Step 8 on, write some log messages
+        self.logObj.debug('this is my first log message!')
         
     def __parseStructs(self, curStruct, prevStruct):
         # initial scan which records where the startChar and 
         # endChar's are found.
+        self.logObj.debug("parsing the file for start and end points.")
         startEnd = []
         lineNum = 0
         for line in self.fh:
@@ -412,17 +154,40 @@ class DNETStructParser():
             for char in line:
                 if char == self.startChar:
                     startEnd.append(['START', lineNum, charNum])
+                    self.logObj.debug("start line:" + str(lineNum) + ' start char:' + str(charNum))
                 elif char == self.endChar:
                     startEnd.append(['END', lineNum, charNum])
+                    self.logObj.debug("end line:" + str(lineNum) + ' start char:' + str(charNum))
                 charNum += 1
             lineNum += 1
-        #print startEnd
-        # now that I know where the startChar and endChars are located
-        # the next step is to stuff them into a hierarchical data structure
-        hierarchDataStruct = self.__restruct(startEnd)
-        return hierarchDataStruct
+        self.struct = self.__restruct(startEnd)
                     
     def __restruct(self, elemList):
+        '''
+        This method works in conjunction with the __parseStructs
+        method.  __parseStructs will identify the line and character
+        postions of data structures contains in the dnet file.  This
+        method then uses that information and restructures it into 
+        a hierarchical data structure.
+        
+        What gets returned in an element object.  That element object
+        describes the bayes network.  Within that object are the nodes
+        that make up the network.
+        
+        :param  elemList: a python 2d list, each inner item is made up
+                          of three entries:
+                           1. 'START' | 'END' either of these strings
+                              used to describe wether the entry describes
+                              the start or end of a structure.
+                           2. linenumber
+                           3. character position on that line
+        :type elemList: python 2d list
+        
+        :returns: Element Object that contains the start end end positions
+                  of various objects that make up the Bayes Network.
+        :rtype: Element Object
+        '''
+        self.logObj.debug("started the __restruct method")
         curElemCnt = 0
         startElemObj = element()
         curElemObj = startElemObj
@@ -440,6 +205,10 @@ class DNETStructParser():
                     startCol = elemList[curElemCnt][2]
                     endLine = elemList[curElemCnt + 1][1]
                     endCol = elemList[curElemCnt + 1][2]
+                    self.logObj.debug("startLine:" + str(startLine))
+                    self.logObj.debug("startCol:" + str(startCol))
+                    self.logObj.debug("endLine:" + str(endLine))
+                    self.logObj.debug("endCol:" + str(endCol))
                     curElemObj.setStartAndEnd(startLine, startCol, endLine, endCol)
                     #curElemObj.printProperties()
                     parentObj = curElemObj.getParent()
@@ -477,6 +246,16 @@ class DNETStructParser():
         return startElemObj
      
     def getNodeStartendLines(self):
+        '''
+        Checks to see if the self.struct property has been populated, if it 
+        has not then methods are run to populate it.  Then returns the contents 
+        of that property.  struct will contain an element object that describes
+        start and end points of objects that make up the bayes network.        
+        
+        :returns: An element object that describes where in the dnet file 
+                  various aspects are located that make up the bayes network
+        :rtype: Element object
+        '''
         # returns an element object.  Element objects are a hierarchical 
         # data structure that describes the start and end points of nodes
         # or verticies within the dnet file
@@ -486,26 +265,47 @@ class DNETStructParser():
     
     def populateBayesParams(self):
         '''
-        This method will take the values out of the actual file 
-        put them into a bayesElement object and then attach that 
-        object to the element object that describes there position
-        in the file
-        '''
+        Checks to see if the struct property has been populated. If it 
+        has not been, then calls the various methods that will do that.
+        
+        Then it calls methods necessary to extract information out of the
+        dnet file that describes the bayesnetwork.  Returns an instance of 
+        the ParseBayesNet class.
+        
+        :returns: a ParseBayesNet object that contains the parsed information 
+                  from the dnet file.
+        :rtype: ParseBayesNet object
+        '''        
         if not self.struct:
             self.parseStartEndPoints()
         bayesParseObj = ParseBayesNet(self.struct, self.dnetFile)
         bayesParseObj.parse()
-        
+        return bayesParseObj
 
 class ParseBayesNet():
     '''
     This class will extract the information contained in the dnet file
     and place it into a BayesData object.  The BayesData object is 
     designed to make it easy to extract the information for use with 
-    other bayesian libraries.
+    other bayesian libraries.  This class contains the methods used 
+    to extract that information, while the BayesData module contains
+    the classes used to store and then subsequently access that 
+    information from.
+    
+    :ivar bayesDataObj: a netica network object.
+    :ivar dnetFile: A string that describes the source dnet file
+    :ivar dnetFileMem: The dnet file that has been read into memory.
+                       this is the reference to that in memory data
+                       structure.
+    :ivar struct: This is the element object that was calculated by 
+                  the DNETStructParser class.
     '''
+    
+    logger = None
+    
     # This is the parser which will populate a BayesData object below
     def __init__(self, struct, dnetFile):
+        self.__initLogging()
         self.struct = struct
         self.dnetFile = dnetFile
         
@@ -513,15 +313,40 @@ class ParseBayesNet():
         self.dnetFileMem = None
         self.bayesDataObj = NeticaData.neticaNet()
     
+    def __initLogging(self):
+        # This code is here just cause I like to have my log messages contain
+        # Module.Class.Function for each message.  If you don't care too much about what 
+        # you log messages look like in the log file, you can bypass this.
+        curFile = inspect.getfile(inspect.currentframe())  
+        if curFile == '<string>':
+            curFile = sys.argv[0]
+        logName = os.path.splitext(os.path.basename(curFile))[0] + '.' + self.__class__.__name__
+        # and this line creates a log message
+        self.logger = logging.getLogger(logName)
+    
     def getBayesDataObj(self):
-        ''' returns the netica data object that this 
+        '''
+        returns the netica data object that this 
         method is going to create and populate with the 
         contents from a file.
+        
+        :returns: Returns the a NeticaData.neticaNet object, or in 
+                  english a reference to a NeticaData, Netica network 
+                  object that contains all the information parsed from 
+                  the netica dnet file, with a nice easy to use api 
+                  wrapped around it.
+        :rtype: NeticaData.neticaNet object
         '''
         return self.bayesDataObj
         
     def parse(self):
-        print '-------------------- Populating Bayes Params --------------------'
+        '''
+        This method rips through the dnet file, extracting information from it and
+        putting it into the NeticaData.neticaNet object.  Once this is complete it 
+        becomes much easier to access that information
+        '''
+        #print '-------------------- Populating Bayes Params --------------------'
+        self.logger.debug("starting the parse of the dnet file...")
         # assume the first element in the structure is the bayes network values.
         self.__readFileIntoMemory()
         firstLine = True
@@ -530,7 +355,7 @@ class ParseBayesNet():
         skipEndLine = 0
         for elem in self.struct:
             curLine = elem.getStartLine()
-            elem.printProperties('     ')
+            #elem.printProperties('     ')
             if firstLine:
                 self.__parseFirstLine(elem)
                 firstLine = False
@@ -548,12 +373,18 @@ class ParseBayesNet():
                     # skip visual elements
                     skip = True
                     skipEndLine = elem.getEndLine()
-                    elem.printProperties()
+                    #elem.printProperties()
                 elif elemType.upper() == 'NODE':
                     self.__parseNode(elem)
                 else:
-                    elem.printProperties()
-        
+                    #elem.printProperties()
+                    startLineNum = elem.getStartLine()
+                    startLine = self.__getLine(startLineNum)
+                    message = 'The following is the declaration line of a data structure '  + \
+                              '(' + str(startLine) + '...) it contains a type that the parser ' + \
+                              'is going to ignore!  It occurs on line: ' + str(startLineNum)
+                    warnings.warn(message)
+                    
     def __parseNode(self, elem):
         '''
         Recieves and element object that describes a node.
@@ -567,12 +398,15 @@ class ParseBayesNet():
         nodeObj = self.bayesDataObj.newNode(elemName)
         # now increment the line:
         curLineNum += 1
-        print 'endLine:', endLine
+        #print 'endLine:', endLine
+        self.logger.debug("endline: " + str(endLine))
         while curLineNum <= endLine:
             curLineNum = self.__parseAttributeLine(curLineNum, nodeObj, endLine)
-            print 'curLineNum is:', curLineNum
+            self.logger.debug("curLineNum:" + str(curLineNum))
+            #print 'curLineNum is:', curLineNum
                     
-        print startLine, ' of node'
+        #print startLine, ' of node'
+        self.logger.debug("startLine: " + str(startLine))
         
     def __parseAttributeLine(self, lineNum, nodeObj, endOfNodeLine ):
         '''
@@ -627,20 +461,22 @@ class ParseBayesNet():
                 if endLine:
                     # in other words if the current line points to a struct
                     # skip over it...
-                    print 'lines: ', lineNum, 'to', endLine, 'are part of a struct'
+                    #print 'lines: ', lineNum, 'to', endLine, 'are part of a struct'
                     lineNum = endLine + 1
                     continue
                 # retrieve the line for the current lineNum
                 line = self.__getLine(lineNum)
                 line = line.strip() # strip off concluding lines.
-                print 'line:', line
+                #print 'line:', line
+                self.logger.debug("line: " + str(line))
                 if multiLine:
                     multiLine = multiLine + '\n ' + line
                 else:
                     multiLine = line
                 if line[len(line) - 1] == ';':
-                    print 'MULTILINE:', multiLine
-                    print 'lineNum', lineNum
+                    #print 'MULTILINE:', multiLine
+                    #print 'lineNum', lineNum
+                    self.logger.debug("MULTILINE: " + str(multiLine))
                     lineNum += 1
                     self.__parseAndEnterMultiLineString(multiLine, nodeObj);
                     break
@@ -661,9 +497,9 @@ class ParseBayesNet():
         var = // col1     col2   (
         
         '''
-        print 'multiLine:'
-        print multiLine
-        
+        #print 'multiLine:'
+        #print multiLine
+        self.logger.debug("multiLine: " + str(multiLine))
         atribType = self.__getAtribType(multiLine)
         
         # first parse the comments that are embedded in the multiline
@@ -705,6 +541,7 @@ class ParseBayesNet():
             nodeObj.setFunctionTableObject(neticafuncTableObj)
         elif atribType == 'comment':
             # don't need comments so skip over
+            self.logger.warn("found a comment string, ignoring it")
             pass
         else:
             msg = 'Found a multiline attribute with the atribType:(' + str(atribType) + \
@@ -722,12 +559,14 @@ class ParseBayesNet():
         and returns the function table object
         '''
         parents = self.__getParentValuesFromTable(multiLine, 1)
-        print 'parents:'
+        #print 'parents:'
+        self.logger.debug("parents : " + str(parents))
         retVal = self.__parseMultilineValues(multiLine)
         #columnList, ParentColumnList = self.__getAttributeHeaders(multiLine)
         atribLoL = self.__getAttributeHeaders(multiLine)
         neticaFuncTable = NeticaData.FuncTable(atribLoL[1], retVal, parents)
-        print neticaFuncTable
+        self.logger.debug("netica func table: " + str(neticaFuncTable))
+        #print neticaFuncTable
             
     def __parseProbMultiLineAttribute(self, multiLine, commentPositionList):
         '''
@@ -782,23 +621,28 @@ class ParseBayesNet():
         endPos = matchObj.end() + startPosition
         justFirstColumns = multiLine[startPosition:endPos]
         #print 'headers:', multiLine[startPosition:endPos]
+        self.logger.debug("Headers: " + str(multiLine[startPosition:endPos]))
         # now need to find the number of spaces over for each additional 
         # comment.  The first will always be 0.
         findIterObj = re.finditer('\S+\s*', justFirstColumns)
         columnPositions = []
         for mtch in findIterObj:
             columnPositions.append( mtch.start() )
-        print 'columnPositions', columnPositions
+        #print 'columnPositions', columnPositions
+        self.logger.debug("columnPositions: " + str(columnPositions))
         # now remove the first value as it only identifies the start of the 
         # comment followed by the white space.  ie // followed by a space that 
         # preceds the first comment.
         columnPositions.pop(0)
         #print 'columnPositions', columnPositions
+        self.logger.debug("columnPositions: " + str(columnPositions))
         parentValuePositions = commentPositions[numberOfHeaderComments:]
         #print len(multiLine)
+        self.logger.debug("length of multiline ( len(multiLine) ): " + str(len(multiLine)))
         for position in parentValuePositions:
             #print 'position', position
             # set the initial line end position
+            self.logger.debug("position: " + str(position))
             lineEndPos = len(multiLine)
             # create an iterator that finds the newline positions in front 
             # of the current comment string
@@ -809,13 +653,17 @@ class ParseBayesNet():
             # set the iterator back to 0 is to recreate so...
             iterObj = re.finditer('\n',multiLine[position:] )
             #print 'iterCnt', iterCnt
+            self.logger.debug("iterCnt: " + str(iterCnt))
             if iterCnt:
                 firstReObj = iterObj.next()
                 lineEndPos = firstReObj.start() + position
             #print 'lineEndPos', lineEndPos
+            self.logger.debug("lineEndPos: " + str(lineEndPos))
             #print 'comment is', multiLine[position:lineEndPos]
+            self.logger.debug("comment is:" + str(multiLine[position:lineEndPos]))
             comment = multiLine[position:lineEndPos]
             #print 'comment', comment
+            self.logger.debug("comment: " + str(comment))
             innerList = []
             cnt = 0
             while cnt < len(columnPositions):
@@ -825,6 +673,7 @@ class ParseBayesNet():
                     valueToAdd = comment[columnPositions[cnt]:columnPositions[cnt + 1]]
                 valueToAdd = valueToAdd.replace("//", '').replace(";", '').strip()
                 #print valueToAdd
+                self.logger.debug("valueToAdd: " + str(valueToAdd))
                 innerList.append(valueToAdd)
                 cnt += 1
             #for colPos in columnPositions:
@@ -841,6 +690,7 @@ class ParseBayesNet():
             #valueList.append(commentList)
             valueList.append(innerList)
         #print valueList
+        self.logger.debug("valueList:" + str(valueList))
         return valueList
     
     def __getParentValuesFromProbsTable(self, multiLine):
@@ -909,11 +759,13 @@ class ParseBayesNet():
         
         ['NoResult', 'NoDefects', 'OneDefect'], ['T1', 'R1', 'T2', 'CC']
         '''
-        print '\nmultiLine', multiLine
+        #print '\nmultiLine', multiLine
+        self.logger.debug("multiLine: " + str(multiLine))
         firstList = []
         commentPositions = self.__getPositions(multiLine, 'comment')
         newLine = self.__getPositions(multiLine[commentPositions[0]:], 'new_line')
-        print 'newLine', newLine
+        #print 'newLine', newLine
+        self.logger.debug("newLine:" + str(newLine))
         # determine if the first line of comments contains two 
         # dimensions of comments, ie, 
         # // var var var //var var
@@ -927,18 +779,21 @@ class ParseBayesNet():
             firstString = multiLine[commentPositions[0]:commentPositions[1]]
             firstString = firstString.replace('//','').replace('\n','').strip()
             firstList = re.split('\s+', firstString)
-            print 'firstList', firstList
+            #print 'firstList', firstList
+            self.logger.debug("firstList:" + str(firstList))
             
             # Extracting and converting the second set of comments
             secString = multiLine[commentPositions[1]:newLine[0] + commentPositions[0]]
             secString = secString.replace('//','').replace('\n','').strip()
             secList = re.split('\s+', secString)
-            print 'secList', secList
+            self.logger.debug("secList: " + str(secList))
+            #print 'secList', secList
         else:
             secString = multiLine[commentPositions[0]: newLine[0] + commentPositions[0]]
             secString = secString.replace('//','').replace('\n','').strip()
             secList = re.split('\s+', secString)
-            print 'secList', secList
+            #print 'secList', secList
+            self.logger.debug("secList: " + str(secList))
         return firstList, secList
     
     def __parseMultilineValues(self, multiLine):
@@ -973,11 +828,14 @@ class ParseBayesNet():
         
         '''
         atribType = self.__getAtribType(multiLine)
-        print 'atribType', atribType
+        #print 'atribType', atribType
+        self.logger.debug("atribType:" + str(atribType))
         equalPosList = self.__getPositions(multiLine, 'equal')
         atribList1, atribList2 = self.__getAttributeHeaders(multiLine)
-        print 'atribList1', atribList1
-        print 'atribList2', atribList2
+        #print 'atribList1', atribList1
+        self.logger.debug("atribList1: " + str(atribList1))
+        #print 'atribList2', atribList2
+        self.logger.debug("atribList2: " + str(atribList2))
         # These lines are extracting the actual data from the
         # multiline attribute.
         dataStructString = ''
@@ -994,13 +852,15 @@ class ParseBayesNet():
             #if not self.__is_number(probabilityValues):
             probabilityValues, arrayType = self.__getJustValue(probabilityValues, arrayType)
                 
-            print 'probabilityValues', probabilityValues
+            #print 'probabilityValues', probabilityValues
+            self.logger.debug("probabilityValues: " + str(probabilityValues))
             if probabilityValues:
                 dataStructString = dataStructString + ' ' + probabilityValues
         
         if dataStructString[len(dataStructString)-1] == ';':
             dataStructString = dataStructString[:len(dataStructString)-1]
-        print dataStructString
+#         print dataStructString
+        self.logger.debug("dataStructString: " + str(dataStructString))
         rawvar = eval(dataStructString)
         if arrayType == 'float':
             var = numpy.array(rawvar, numpy.double)
@@ -1011,21 +871,27 @@ class ParseBayesNet():
             # Needs to be reshaped down to a two dimensional structure
             newShapeParam = 1
             cnter = 0
-            print 'dim', dim
+            #print 'dim', dim
+            self.logger.debug("dim: " + str(dim))
             while cnter < len(dim) - 1:
                 newShapeParam = newShapeParam * dim[cnter]
                 
                 cnter += 1
-            print 'newShapeParam', newShapeParam
-            print 'len(atribList1)', len(atribList1)
-            print 'len(atribList2)', len(atribList2)
+            self.logger.debug("newShapeParam: " + str(newShapeParam))
+            self.logger.debug("len(atribList1): " + str(len(atribList1)))
+            self.logger.debug("len(atribList2): " + str(len(atribList2)))
+
+            #print 'newShapeParam', newShapeParam
+            #print 'len(atribList1)', len(atribList1)
+            #print 'len(atribList2)', len(atribList2)
             if atribType == 'functable':
                 var = var.reshape(newShapeParam, dim[len(dim) - 1])
             else:
                 var = var.reshape(newShapeParam, len(atribList1))
         var = var.tolist()
-        print 'var is:'
-        print var
+        self.logger.debug("var: " + str(var))
+        #print 'var is:'
+        #print var
         return var
     
     def __getJustValue(self, value, atribType):
@@ -1035,12 +901,14 @@ class ParseBayesNet():
         it will wrap the value in quotes and return it.
         
         '''
+        self.logger.debug("input: " + str(value) + ' atribType: ' + str(atribType))
         tmpVal = value[0:]
         tmpVal = tmpVal.replace('\n', '').replace('(', '').replace(')', '').replace(',','').replace(';', '')
         if not self.__is_number(tmpVal) and tmpVal:
             newVal = "'" + tmpVal + "'"
             value = value.replace(tmpVal, newVal)
             atribType = 'str'
+        self.logger.debug("output: " + str(value) + ' atribType: ' + str(atribType))
         return value, atribType
     
     def __is_number(self, num):
@@ -1067,10 +935,12 @@ class ParseBayesNet():
         #TODO: 10-3-2013 current this method parses up this data structure into a dictionary.  We need to get that entered as a NeticaProabilityTable.  in the module NeticaData
         commentPositionList = self.__getPositions(multiLine, 'comment')
 
-        print 'commentPos', commentPositionList
+        #print 'commentPos', commentPositionList
+        self.logger.debug("commentPositionList: " + str(commentPositionList))
         leftPosList = self.__getPositions(multiLine, 'left_paren')
         rightPosList = self.__getPositions(multiLine, 'right_paren')
-        print 'left', leftPosList
+        #print 'left', leftPosList
+        self.logger.debug("left: " + str(leftPosList))
         columnString = multiLine[commentPositionList[0]:leftPosList[0]]
         columnString = columnString.replace('//', '').strip()
         columnList = re.split('\s+', columnString)
@@ -1189,7 +1059,7 @@ class ParseBayesNet():
                   'the first element line is (' + curLine + ')'
             raise ValueError, msg
         self.bayesDataObj.setName(elemList[1])
-        print elemList
+        #print elemList
         
     def __readFileIntoMemory(self):
         '''
@@ -1210,13 +1080,6 @@ class ParseBayesNet():
         line = line.strip()
         partList = re.split('\s+', line)
         return partList[:2]
-        
-        
-        
-    
-     
-        
-    
         
 class element():
     '''
@@ -1507,10 +1370,6 @@ class element():
             #child.printProperties()
             child.printData(child)
     
-
-
-    
-    
 if __name__ == '__main__':
     neticaDataDir = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica_data'
     dnetFile = os.path.join(neticaDataDir, r'Car_Buyer.dnet.txt')
@@ -1518,7 +1377,7 @@ if __name__ == '__main__':
     
     startEndParse = DNETStructParser(dnetFile)
     startEndParse.parseStartEndPoints()
-    startEndParse.populateBayesParams()
+    parseBayes = startEndParse.populateBayesParams()
     
     #parser = parseDNET(dnetFile)
     #parser.parse()
