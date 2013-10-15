@@ -6,10 +6,10 @@ Created on 2013-08-01
 # This is an attempt to figure out how to model the mule 
 # deer model using the openbayes module.
 #
-
-from OpenBayes import BNet, BVertex, DirEdge, JoinTree # @UnresolvedImport
 import site
 import sys
+
+from OpenBayes import BNet, BVertex, DirEdge, JoinTree # @UnresolvedImport
 dir = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\scripts\deps\Lib\site-packages'
 site.addsitedir(dir)  # @UndefinedVariable
 
@@ -47,7 +47,7 @@ network.add_e(DirEdge(len(network.e), habitat_hazard_rating, muleDeerHazardRatin
 
 network.InitDistributions()
 #                                         <1km   /  1-2km  /   2-3km
-road_Density.setDistributionParameters([0.3333333,   0.3333333,   0.3333334])
+# road_Density.setDistributionParameters([0.3333333,   0.3333333,   0.3333334])
 #                                                HIGH  /  MODERATE  /  LOW
 cougar_risk_level.setDistributionParameters([0.3333333, 0.3333334, 0.3333333])
 #                                    Present /   Not Present
@@ -200,6 +200,8 @@ jTree = JoinTree(network)
 # marginalize: Given a joint distribution, we can compute the distributions of each variable
 #independently, which are called the marginal distributions.
 margResults = jTree.MarginaliseAll()
+jTree.Print()
+
 print '=============================================================='
 print 'Without evidence:\n'
 for n, r in margResults.items():
