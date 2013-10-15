@@ -250,6 +250,13 @@ class neticaNode(object):
         self.logger = logging.getLogger(logName)
     
     def getParentNames(self):
+        '''
+        Gets the parent names for the current node
+        
+        :returns: a list of strings containing the names of the parent 
+                  nodes
+        :rtype: list(neticaNode)
+        '''
         # There is a flaw in how the parents are populated.  In a rush to get this 
         # working, so instead of findign the flaw I am patching up this data when
         # it gets requested.
@@ -261,11 +268,25 @@ class neticaNode(object):
         return self.parents
     
     def setName(self, name):
+        '''
+        Sets the name for the node object
+        
+        :param  name: string containing the name you wish to assign to the 
+                      current node object
+        :type name: string
+        '''
         self.name = name
         self.logger.debug("name is: " + str(name))
         
     def isDiscrete(self):
+        '''
+        Returns a boolean value indicating whether the current node is 
+        discrete or not.       
         
+        :returns: A boolean value indicating whether the current node is 
+                  discrete or not
+        :rtype: boolean
+        '''
         return self.discrete
             
     def getStates(self):
@@ -286,7 +307,10 @@ class neticaNode(object):
         value is a None value it indicates there is no value checking 
         on this attribute type. 
         
-        all types are in lower case.
+        all types are in lower case
+        
+        :returns: dictionary containing validation information
+        :rtype: python dictionary
         '''
         validationDict = {'name': None, 
                           'states': None, 
@@ -302,8 +326,11 @@ class neticaNode(object):
         
     def setProbabilityTable(self, neticaProbabilityTable):
         '''
-        Enters a ProbsValueTable to the current nodes
-        probs attribute
+        sets the probability table for the current node.  Recieves a ProbsValueTable
+        and assigns it to the property probabilityTable
+        
+        :param  neticaProbabilityTable: a netica probability table
+        :type neticaProbabilityTable: ProbsValueTable
         '''
         self.probabilityTable = neticaProbabilityTable
         self.logger.debug("node name is: " + str(self.name))
@@ -311,7 +338,14 @@ class neticaNode(object):
         self.logger.debug("likelyhoods in the table are: " + str(neticaProbabilityTable.getLikelyHoodTable()))
       
     def getProbabilityTable(self):
-        print 'kind', self.kind
+        '''
+        returns the probability table associated with this node.
+        
+        
+        :returns: probability table
+        :rtype: ProbsValueTable
+        '''
+        #print 'kind', self.kind
         if not self.probabilityTable and self.kind.upper() <> 'UTILITY':
             warnMsg = 'There is no probability table for the node "' + \
                       str(self.name) + '" Going to create one with ' + \
@@ -321,6 +355,10 @@ class neticaNode(object):
         return self.probabilityTable
     
     def __makeProbabilityTable(self):
+        '''
+        Creates a probability table with equal probabilities for each 
+        of the possible states of that the node can assume.
+        '''
         # create the probabiltiy table with an equal value for each
         # state.  
         # think about what to do with parent nodes
@@ -329,12 +367,31 @@ class neticaNode(object):
       
     def setFunctionTableObject(self, funcTable):
         '''
+        Recieves a netica function table object.  Drops this information
+        into the nodes funcTable parameter.
         
+        :param  funcTable: a function table. Function tables are like a 
+                           junction tree.  They are used by netica software, at
+                           the conclusion of a belief network.  They identify 
+                           what the final state is depending on what the parent
+                           nodes states are.
+        :type funcTable: FuncTable
         '''
         self.funcTable = funcTable
         self.logger.debug('func table is: ' + str(funcTable))
     
     def enterAndValidateSimpleAttribute(self, property, value):
+        '''
+        Recieves two values.  The first is the name of the property, and the 
+        second is the value that is to be assigned to it.  This method will 
+        validate the property, and the value against information contained in
+        the validation dictionary. (self.validationDict) 
+        
+        :param  property: name of the property that is to be populated
+        :type property: string
+        :param  value: the value that goes with the property
+        :type value: (various)
+        '''
         
         #property = property.lower()
         #value = value.lower()
@@ -386,7 +443,12 @@ class neticaNode(object):
             setattr(self, property, value)
     
 class neticaEdge(object):
+    '''
+    Created this class as it may be useful down the road.  For now it is 
+    not used.  Instead edges are derived from parent values of each node / 
+    vertex in the network
     
+    '''
     def __init__(self):
         pass
     
@@ -466,6 +528,9 @@ class ProbsValueTable(object):
         self.struct = {}
         
     def __initLogging(self):
+        '''
+        Sets up logging for the current method.
+        '''
         # This code is here just cause I like to have my log messages contain
         # Module.Class.Function for each message.  If you don't care too much about what 
         # you log messages look like in the log file, you can bypass this.
@@ -478,13 +543,23 @@ class ProbsValueTable(object):
         
     def setRootValues(self, likelyHoodTable=None):
         '''
-        This type of probability table has no priors.  It describes only 
-        the likelyhoods of each of the states upon initiation of this node.
+        This method is used to assign probability tables that have no 
+        priors / parents.
+        
+        It describes only the likelyhoods of each of the states upon initiation
+        of this node.
         
         Examples: 
             probs = 
         // Peach        Lemon        
           (0.8,         0.2);
+        
+        :param  likelyHoodTable: a python list containing the probabilities of 
+                                 each state associated with the the node.  If 
+                                 no likelyhood table is provided then the method
+                                 will assign equal probabilities for each possible
+                                 state of the node.
+        :type likelyHoodTable: list
         '''
         if likelyHoodTable:
             self.valueStruct = likelyHoodTable
@@ -495,10 +570,29 @@ class ProbsValueTable(object):
             print 'valueStruct', self.valueStruct
         
     def getLikelyHoodTable(self):
+        '''
+        Returns the probability table
+        
+        
+        :returns: a probability table
+        :rtype: 2d list
+        '''
 #         if not self.valueStruct:
         return self.valueStruct
     
     def getParentValuesTable(self):
+        '''
+        Returns the parent values for the probability table.  parent values are a
+        2d list.  Each internal list describes one set of possible values from the 
+        parent values.
+        
+        The number of elements in each internal list should be the same as the number
+        of values contained in the nodes parent property.  The number of inner lists 
+        should be the same as the number of inner lists in the likelyhood table.
+        
+        :returns: a 2d list containing all the possible parent input values
+        :rtype: 2d list
+        '''
         return self.parentValueStruct
             
     def setValues(self, likelyHoodTable, parentValuesTable):
@@ -511,6 +605,13 @@ class ProbsValueTable(object):
         
         If information exists in the struct it gets over 
         written
+        
+        :param  likelyHoodTable: a 2d list containing the likelyhoods of various
+                                 states of the current node, given a set of values
+                                 in the parent nodes.
+        :type likelyHoodTable: 2d list
+        :param  parentValuesTable: a 2d list containing the possible parent values
+        :type parentValuesTable: 2d list
         '''
         # first verify that they both contain the same number of
         # rows
@@ -614,13 +715,14 @@ class netica2OpenBayes(object):
         
     def __loadDistributions(self):
         '''
-        This is where things start to get a bit tricky!
+        When this method is called the OpenBayes network will have been created, 
+        The nodes will have been created, and the edges will have been defined.  This
+        method will take the likelyhood values parse them and load them to the 
+        openbayes network.
         
-        Step 1. Load get the root nodes, they have no dependencies
-                so its just a matter of loading the probability 
-                tables to the network
-                
-        Step 2. 
+        Once this is complete the network should have the necessary values to 
+        allow you to perform the various bayesian inferences, and other statistical
+        methods on it.
         '''
         # entering distributions for root nodes is different than
         # how you enter nodes that have parents.
