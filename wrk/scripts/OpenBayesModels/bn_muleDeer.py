@@ -6,10 +6,10 @@ Created on 2013-08-01
 # This is an attempt to figure out how to model the mule 
 # deer model using the openbayes module.
 #
-
-from OpenBayes import BNet, BVertex, DirEdge, JoinTree # @UnresolvedImport
 import site
 import sys
+
+from OpenBayes import BNet, BVertex, DirEdge, JoinTree # @UnresolvedImport
 dir = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\scripts\deps\Lib\site-packages'
 site.addsitedir(dir)  # @UndefinedVariable
 
