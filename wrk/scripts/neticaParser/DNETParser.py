@@ -81,11 +81,12 @@ class DNETStructParser():
     endChar = '}'
     
     logFile = ''
-    logObj = None
+    logger = None
     
     def __init__(self, dnetFile):
+        self.__initLogging()
         self.dnetFile = dnetFile
-        self.__initLog()
+        self.logger.debug("test test")
     
     def parseStartEndPoints(self):
         '''
@@ -96,57 +97,29 @@ class DNETStructParser():
         
         The struct propert
         '''
-        self.logObj.debug("opening the dnet file")
+        self.logger.debug("opening the dnet file")
         self.fh = open(self.dnetFile, 'r')
         self.__parseStructs(self.struct, None)
         #print 'self.struct', self.struct
         self.fh.close()
         
-    def __initLog(self):
+    def __initLogging(self):
         '''
-        This method will inialize a log file.  If the T:\ drive exists
-        then it will automatically put the log file there.  If it does not 
-        exist then it will put it in the directory that the TEMP var is 
-        pointing to.
+        sets up logging for this class.
         '''
-        # Calculating the log file name
-        defaultLocation = 'T:\\'
-        s = inspect.stack()
-        module_name = inspect.getmodulename(s[1][1])
-        user = getpass.getuser()
-        timeString = datetime.datetime.now().strftime("%a%b%d%H%M%S")
-        logFile = module_name + '_' + user + '_' + timeString + '.log'
-        if os.path.exists(defaultLocation):
-            self.logFile = os.path.join(defaultLocation, logFile)
-        else:
-            self.logFile = os.path.join(os.environ['TEMP'], logFile)
-        # create the log object
-        self.logObj = logging.getLogger()
-        # create a handler
-        hndlr = logging.FileHandler(self.logFile)
-        # creating a formatter and applying formatting to the formatter 
-        formatString = '%(asctime)s %(name)s.%(funcName)s.%(lineno)d %(levelname)s: %(message)s'
-        formatr = logging.Formatter( formatString )
-        formatr.datefmt = '%m-%d-%Y %H:%M:%S' # set up the date format for log messages
-        # apply to formatter to the handler
-        hndlr.setFormatter(formatr)
-        # Step 5 - tell the log object to use the handler
-        self.logObj.addHandler(hndlr)
-        # Step 6 - set the log level
-        self.logObj.setLevel(logging.DEBUG)
-        # Step 7 - create a logging object that this module will use to write its log messages to
-        #             the name of the log object will be moduleName.className
-        logName = module_name + '.' + self.__class__.__name__
-        #print 'logName', logName
-        self.logObj = logging.getLogger( logName )
-        
-        # Step 8 on, write some log messages
-        self.logObj.debug('this is my first log message!')
+        # This code is here just cause I like to have my log messages contain
+        # Module.Class.Function for each message.  If you don't care too much about what 
+        # you log messages look like in the log file, you can bypass this.
+        logName = __name__ + '.' + self.__class__.__name__
+        # and this line creates a log message
+        self.logger = logging.getLogger(logName) #.addHandler(logging.NullHandler())
+        print 'logName here', logName
+        self.logger.debug("test test 1 2 3")
         
     def __parseStructs(self, curStruct, prevStruct):
         # initial scan which records where the startChar and 
         # endChar's are found.
-        self.logObj.debug("parsing the file for start and end points.")
+        self.logger.debug("parsing the file for start and end points.")
         startEnd = []
         lineNum = 0
         for line in self.fh:
@@ -154,10 +127,10 @@ class DNETStructParser():
             for char in line:
                 if char == self.startChar:
                     startEnd.append(['START', lineNum, charNum])
-                    self.logObj.debug("start line:" + str(lineNum) + ' start char:' + str(charNum))
+                    self.logger.debug("start line:" + str(lineNum) + ' start char:' + str(charNum))
                 elif char == self.endChar:
                     startEnd.append(['END', lineNum, charNum])
-                    self.logObj.debug("end line:" + str(lineNum) + ' start char:' + str(charNum))
+                    self.logger.debug("end line:" + str(lineNum) + ' start char:' + str(charNum))
                 charNum += 1
             lineNum += 1
         self.struct = self.__restruct(startEnd)
@@ -187,7 +160,7 @@ class DNETStructParser():
                   of various objects that make up the Bayes Network.
         :rtype: Element Object
         '''
-        self.logObj.debug("started the __restruct method")
+        self.logger.debug("started the __restruct method")
         curElemCnt = 0
         startElemObj = element()
         curElemObj = startElemObj
@@ -205,10 +178,10 @@ class DNETStructParser():
                     startCol = elemList[curElemCnt][2]
                     endLine = elemList[curElemCnt + 1][1]
                     endCol = elemList[curElemCnt + 1][2]
-                    self.logObj.debug("startLine:" + str(startLine))
-                    self.logObj.debug("startCol:" + str(startCol))
-                    self.logObj.debug("endLine:" + str(endLine))
-                    self.logObj.debug("endCol:" + str(endCol))
+                    self.logger.debug("startLine:" + str(startLine))
+                    self.logger.debug("startCol:" + str(startCol))
+                    self.logger.debug("endLine:" + str(endLine))
+                    self.logger.debug("endCol:" + str(endCol))
                     curElemObj.setStartAndEnd(startLine, startCol, endLine, endCol)
                     #curElemObj.printProperties()
                     parentObj = curElemObj.getParent()
@@ -322,6 +295,7 @@ class ParseBayesNet():
             curFile = sys.argv[0]
         logName = os.path.splitext(os.path.basename(curFile))[0] + '.' + self.__class__.__name__
         # and this line creates a log message
+        print 'logName', logName
         self.logger = logging.getLogger(logName)
     
     def getBayesDataObj(self):
@@ -531,14 +505,15 @@ class ParseBayesNet():
         if atribType == 'probs':
             # if its a probability, there are two types.  Root nodes who's probabilities only describe the starting probabilities fo the nodes state, and junction nodes that define the state depending on the state of parents.
             if len(commentPositionList) == 1:
-                neticaProbabilityTable = self.__parseSingleListMultiLineProbAttribute(multiLine)
+                neticaProbabilityTable = self.__parseSingleListMultiLineProbAttribute(multiLine, nodeObj)
             else:
                 neticaProbabilityTable = self.__parseProbMultiLineAttribute(multiLine, commentPositionList)
             # TODO: the neticaProbabilityTable now needs to be attached to the nodeObject
             nodeObj.setProbabilityTable(neticaProbabilityTable)
         elif atribType == 'functable':
-            neticafuncTableObj = self.__parseFuncTableMultiLineAttribute(multiLine)
+            neticafuncTableObj = self.__parseFuncTableMultiLineAttribute(multiLine, nodeObj)
             nodeObj.setFunctionTableObject(neticafuncTableObj)
+            print 'set function table for the node:', nodeObj.getName()
         elif atribType == 'comment':
             # don't need comments so skip over
             self.logger.warn("found a comment string, ignoring it")
@@ -551,22 +526,34 @@ class ParseBayesNet():
                   'proceed!'
             raise ValueError, msg
             
-    def __parseFuncTableMultiLineAttribute(self, multiLine):
+    def __parseFuncTableMultiLineAttribute(self, multiLine, nodeObj):
         '''
         recieves a multiline string that contains a function table.
         parses the function table, creates a function table object
         enters the information correctly into the function table object
         and returns the function table object
         '''
+        # TODO: need to change this so that it can convert this function table into a 
+        #       probability table.  Then OpenBayes library will be able to read it.
         parents = self.__getParentValuesFromTable(multiLine, 1)
-        #print 'parents:'
+        #print 'parents:', parents
         self.logger.debug("parents : " + str(parents))
         retVal = self.__parseMultilineValues(multiLine)
-        #columnList, ParentColumnList = self.__getAttributeHeaders(multiLine)
+        #retVal = self.__restructure(retVal, 1)
+        
+        #print 'retVal:', retVal
+#         columnList, ParentColumnList = self.__getAttributeHeaders(multiLine)
         atribLoL = self.__getAttributeHeaders(multiLine)
-        neticaFuncTable = NeticaData.FuncTable(atribLoL[1], retVal, parents)
+        #print 'atribLoL', atribLoL
+        levels = nodeObj.getLevels()
+        states = nodeObj.getStates()
+        #print 'states:', states
+        #print 'levels', levels
+        neticaFuncTable = NeticaData.FuncTable(atribLoL[1], retVal, parents, levels, states)
+        #neticaFuncTable.printTable()
         self.logger.debug("netica func table: " + str(neticaFuncTable))
         #print neticaFuncTable
+        return neticaFuncTable
             
     def __parseProbMultiLineAttribute(self, multiLine, commentPositionList):
         '''
@@ -869,7 +856,13 @@ class ParseBayesNet():
         else:
             var = numpy.array(rawvar)
         dim = var.shape
-        if len(dim) > 2:
+        print 'dim', dim
+        # if we are dealing with a function table we want to restructure the data structure
+        # so its just a single dimension list.
+        # for probability tables we want 2d.  Each inner list represents the set of probabilities
+        # associated with a set of parent pre-conditions.  ie (if parents are abc then the probs of the
+        # state of this node are 10, 20 ....
+        if len(dim) > 2 or atribType == 'functable':
             # Needs to be reshaped down to a two dimensional structure
             newShapeParam = 1
             cnter = 0
@@ -886,14 +879,18 @@ class ParseBayesNet():
             #print 'newShapeParam', newShapeParam
             #print 'len(atribList1)', len(atribList1)
             #print 'len(atribList2)', len(atribList2)
+            print 'atribType', atribType
             if atribType == 'functable':
-                var = var.reshape(newShapeParam, dim[len(dim) - 1])
+                # we are dealing with a function table, converting to just a list of values.
+                newShapeParam = newShapeParam * dim[len(dim) - 1]
+                print 'dim:', dim
+                print 'newShapeParam', newShapeParam
+                print 'dim[len(dim) - 1]', dim[len(dim) - 1]
+                var = var.reshape(newShapeParam)
             else:
                 var = var.reshape(newShapeParam, len(atribList1))
         var = var.tolist()
         self.logger.debug("var: " + str(var))
-        #print 'var is:'
-        #print var
         return var
     
     def __getJustValue(self, value, atribType):
@@ -920,7 +917,7 @@ class ParseBayesNet():
         except ValueError:
             return False
 
-    def __parseSingleListMultiLineProbAttribute(self, multiLine):
+    def __parseSingleListMultiLineProbAttribute(self, multiLine, nodeObj):
         '''
         This method will take a data structure described in a string
         like this:
@@ -945,10 +942,23 @@ class ParseBayesNet():
         self.logger.debug("left: " + str(leftPosList))
         columnString = multiLine[commentPositionList[0]:leftPosList[0]]
         columnString = columnString.replace('//', '').strip()
-        columnList = re.split('\s+', columnString)
+        states = nodeObj.getStates()
+        #columnList = re.split('\s+', columnString)
+        columnList = states
+        # Going to use the states, but before proceed will confirm that they exist
+        # within the columnString
+        #print 'states', states
+        for state in states:
+            if state not in columnString:
+                msg = 'When trying to parse a node object, discovered that its states are: ' + \
+                      ','.join(states), 'however was unable to find the state (' + state + ') ' +\
+                      'in the probs description (' + multiLine + ')'
+                raise ValueError, msg
         
         dataString = multiLine[leftPosList[0] + 1:rightPosList[0]].strip()
         dataList = re.split('\s*,\s*', dataString)
+        #print 'dataList', dataList
+        #print 'columnList', columnList
                     
         if all(self.__isNum(v) for v in dataList):
             dataList = [ float(x) for x in dataList ]

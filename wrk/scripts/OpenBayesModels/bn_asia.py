@@ -1,11 +1,14 @@
 
 import site
+import sys
+
+from OpenBayes import BNet, BVertex, DirEdge, JoinTree # @UnresolvedImport
+
 
 dir = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\scripts\deps\Lib\site-packages'
 site.addsitedir(dir)  # @UndefinedVariable
 
 
-from OpenBayes import BNet, BVertex, DirEdge, JoinTree  # @UnresolvedImport
 
 network = BNet('Asia Bayesian Network')
 
@@ -82,6 +85,22 @@ dyspnea.distribution[{'Tuberculosis or Cancer':0, 'Bronchitis':0}] = [0, 1]
 dyspnea.distribution[{'Tuberculosis or Cancer':0, 'Bronchitis':1}] = [0.4, 0.6]
 dyspnea.distribution[{'Tuberculosis or Cancer':1, 'Bronchitis':0}] = [0.6, 0.4]
 dyspnea.distribution[{'Tuberculosis or Cancer':1, 'Bronchitis':1}] = [0.8, 0.2]
+
+
+for vert in network.topological_sort():
+    print '---------------------'
+    print vert.name
+    print vert.distribution.cpt
+    if len(vert.distribution.parents) > 0:
+        names = []
+        for vert in vert.distribution.parents:
+            names.append(vert.name)
+        print 'Edges:', ','.join(names)
+    else:
+        print 'Edges: None'
+
+
+sys.exit()
 
 # Build a JoinTree
 join_tree = JoinTree(network)

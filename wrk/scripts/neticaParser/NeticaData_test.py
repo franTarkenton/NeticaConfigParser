@@ -30,7 +30,7 @@ class NeticaDataTest(unittest.TestCase):
         else:
             self.logFile = os.path.join(os.environ['TEMP'], logFile)
         # create the log object
-        self.logObj = logging.getLogger()
+        self.logger = logging.getLogger()
         # create a handler
         hndlr = logging.FileHandler(self.logFile)
         # creating a formatter and applying formatting to the formatter 
@@ -40,16 +40,16 @@ class NeticaDataTest(unittest.TestCase):
         # apply to formatter to the handler
         hndlr.setFormatter(formatr)
         # Step 5 - tell the log object to use the handler
-        self.logObj.addHandler(hndlr)
+        self.logger.addHandler(hndlr)
         # Step 6 - set the log level
-        self.logObj.setLevel(logging.INFO)
+        self.logger.setLevel(logging.INFO)
         # Step 7 - create a logging object that this module will use to write its log messages to
         #             the name of the log object will be moduleName.className
         logName = module_name + '.' + self.__class__.__name__
         #print 'logName', logName
-        self.logObj = logging.getLogger( logName )
+        self.logger = logging.getLogger( logName )
         # Step 8 on, write some log messages
-        self.logObj.debug('this is my first log message!')
+        self.logger.debug('this is my first log message!')
         
         
         

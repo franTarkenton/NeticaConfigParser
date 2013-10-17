@@ -14,6 +14,8 @@ import logging
 import os
 import re
 import sys
+import warnings
+
 import OpenBayes
 
 
@@ -34,10 +36,26 @@ class neticaNet(object):
                      of this list.
     '''
     def __init__(self):
+        self.__initLogging()
         self.name = None
         self.rootNodes = []
         self.nodeDict = {}
         
+    def __initLogging(self):
+        '''
+        sets up logging for this class.
+        '''
+        # This code is here just cause I like to have my log messages contain
+        # Module.Class.Function for each message.  If you don't care too much about what 
+        # you log messages look like in the log file, you can bypass this.
+        curFile = inspect.getfile(inspect.currentframe())  
+        if curFile == '<string>':
+            curFile = sys.argv[0]
+        logName = os.path.splitext(os.path.basename(curFile))[0] + '.' + self.__class__.__name__
+        # and this line creates a log message
+        self.logger = logging.getLogger(logName)
+    
+    
     def setName(self, name):
         '''
         Sets the name of this BBN.
@@ -94,7 +112,7 @@ class neticaNet(object):
                 parents = nodeObj.getParentNames()
                 #print 'parents are:', parents
                 if not nodeObj.getParentNames():
-                    print 'root:',  nodekey
+                    #print 'root:',  nodekey
                     rootNodes.append(nodekey)
         return rootNodes
                     
@@ -119,11 +137,13 @@ class neticaNet(object):
         :rtype: list(str)
         '''
         rootNodeNames = self.getRootNodeNames()
+        print 'root nodes:', rootNodeNames
         allNodeNames = self.getAllNodeNames()
         nonRootNodes = [item for item in allNodeNames if item not in rootNodeNames]
+        print 'nonRootNodes', nonRootNodes
         return nonRootNodes
                 
-    def getParentNodeNames(self, nodeName):
+    def getChildNodeNames(self, nodeName):
         '''
         Give the name of a node, this method will return a list 
         of strings containing the names of the parents to this 
@@ -142,12 +162,11 @@ class neticaNet(object):
         for nodeKey in self.nodeDict.keys():
             nodeObj = self.nodeDict[nodeKey]
             parentNames = nodeObj.getParentNames()
-            for parentName in parentNames:
-                if parentName == nodeName:
-                    retNodes.append(parentName)
+            if nodeName in parentNames:
+                retNodes.append(nodeKey)
         return retNodes
                     
-    def getParentNodes(self, nodeName):
+    def getChildNodes(self, nodeName):
         '''
         Given the name of a node, this method will return a list of 
         neticaNode objects that are parents to the node name that was 
@@ -160,7 +179,7 @@ class neticaNet(object):
         :returns: a list of neticaNode objects that are going to be returned.
         :rtype: list(neticaNode)
         '''
-        parentNodeName = self.getParentNodeNames(nodeName)
+        parentNodeName = self.getChildNodeNames(nodeName)
         retNodes = []
         for parentName in parentNodeName:
             retNodes.append(self.getNode(parentName))
@@ -185,7 +204,7 @@ class neticaNet(object):
                      'however there are not any nodes by this name in this network. ' + \
                      'Nodes that exist are: (' + ','.join(self.nodeDict.keys())
             raise ValueError, errMsg
-        return self.nodeDict[name]    
+        return self.nodeDict[name]
 
 class neticaNode(object):
     '''
@@ -232,8 +251,9 @@ class neticaNode(object):
         self.probabilityTable = None
         self.funcTable = None
         self.discrete = None # True or False
-        
+        self.levels = None
         self.validationDict = self.__getValidationDict()
+        self.valueMap = self.__getValueMap()
     
     def __initLogging(self):
         '''
@@ -278,6 +298,9 @@ class neticaNode(object):
         self.name = name
         self.logger.debug("name is: " + str(name))
         
+    def getName(self):
+        return self.name
+        
     def isDiscrete(self):
         '''
         Returns a boolean value indicating whether the current node is 
@@ -298,8 +321,34 @@ class neticaNode(object):
                   can take on.
         :rtype: list
         '''
+        retVal = None
+        if self.states:
+            return self.states
+        if self.statetitles:
+            return self.statetitles
         return self.states
         
+    def getLevels(self):
+        return self.levels
+        
+    def __getValueMap(self):
+        '''
+        It has been discovered that there can be two different names for some
+        attributes within a netica node.  At the time of this writing have only
+        discovered one, however it is anticipated that more will be comming.
+        
+        The example is the attribute "states" can also be labelled as "statetitles"
+        Both attributes serve the same purpose.  
+        
+        This method will return an attribute map that describes the input label, 
+        and the output attribute.
+        '''
+        # make sure all values are lower case.
+        # TODO: write check that ensures and converts any values in this table to lower case as well as their values
+        valueMap = {'states':'states', 
+                    'statetitles': 'states'}
+        return valueMap
+    
     def __getValidationDict(self):
         '''
         returns a dictionary that contains the information used to 
@@ -312,15 +361,24 @@ class neticaNode(object):
         :returns: dictionary containing validation information
         :rtype: python dictionary
         '''
+        # all keys should be entered in lower case
+        # TODO: should write a validation method that converts any non lower case keys to lower case.
         validationDict = {'name': None, 
-                          'states': None, 
+                          'states': None,
+                          'statetitles':None,
                           'kind': ['NATURE', 'DECISION', 'UTILITY', 'CONSTANT'], 
                           'chance': ['DETERMIN', 'CHANCE'], 
                           'parents': None, 
-                          'probs': None, 
+                          'probs': None,
+                          'belief': None,
+                          'numcases':None,
                           'discrete': [True, False],
                           'title': None, 
                           'functable': None,
+                          'levels': None,
+                          'comment': None,
+                          'whenchanged':None,
+                          'eqndirty': [True, False],
                           'measure':['RATIO', 'NOMINAL', 'LOCAL', 'ORDINAL', 'INTERVAL']}
         return validationDict
         
@@ -353,6 +411,9 @@ class neticaNode(object):
             self.logger.warning(warnMsg)
             self.__makeProbabilityTable()
         return self.probabilityTable
+    
+    def getFunctionTable(self):
+        return self.funcTable
     
     def __makeProbabilityTable(self):
         '''
@@ -392,7 +453,10 @@ class neticaNode(object):
         :param  value: the value that goes with the property
         :type value: (various)
         '''
-        
+        # TODO: Remove this condition, only in place for debugging
+        if property.lower() == 'parents':
+            print '(parent debugging) property', property
+            print '(parent debugging) value', value
         #property = property.lower()
         #value = value.lower()
         valueIsList = False
@@ -409,7 +473,7 @@ class neticaNode(object):
             raise ValueError, msg
         else:
             #validTypes = self.validationDict[property.lower()]
-            validTypes = self.validationDict[property]
+            validTypes = self.validationDict[property.lower()]
             if validTypes:
                 # doing type conversion of the value if the property
                 # contains boolean values
@@ -421,7 +485,7 @@ class neticaNode(object):
                     elif value.lower() == 'false':
                         value = False
                 #if value not in self.validationDict[property.lower()]:
-                if value not in self.validationDict[property]:
+                if value not in self.validationDict[property.lower()]:
                     msg = 'Trying to populate the property: (' + str(property) + \
                           ') with the value: (' + str(value) + ').  Unfortunatly ' +\
                           'this is not a valid value for this property!  ' + \
@@ -432,7 +496,11 @@ class neticaNode(object):
                 if value[len(value) - 1] == ')' and value[0] == '(':
                     value = value[:len(value) - 1]
                     value = value[1:]
+                    #print 'value 1: (', value, ')'
                     value = re.split('\s*,\s*', value)
+                    if value:
+                        value = self.__removeExtraneousQuotes(value)
+                    #print 'value 2: ', value
                 elif value[len(value) - 1] == '"' and value[0] == '"':
                     value = value[:len(value) - 1]
                     value = value[1:]
@@ -441,6 +509,44 @@ class neticaNode(object):
             self.logger.debug("property: " + str(property))
             self.logger.debug("value: " + str(value))
             setattr(self, property, value)
+            
+            # if the property has a value in the valueMap
+            # then write the value to the other property also
+            if self.valueMap.has_key(str(property.lower())):
+                newProp = self.valueMap[property]
+                setattr(self, newProp, value)
+                
+    def __removeExtraneousQuotes(self, value):
+        '''
+        When converting data from the netica file to the neticaData api that has been 
+        created, you can wind up in the situation where string values include the quotes
+        that were used to define them. For example see the list below: 
+        
+            ['"None"', '"Low"', '"Moderate-low"', '"Moderate-high"', '"High"']
+            
+        This method will iterate through each element in the list looking at the 
+        first character and the last character in each element.  If they are both
+        equal to a quote character then they are removed.
+        
+        :param  value: Input list which may or may not have quotes embedded into list 
+                       elements.
+        :type value: list
+        
+        :returns: a list where embedded quotes in each of the elements have been 
+                  removed.  Other than that the list should remain unchanged.
+        :rtype: list
+        '''
+        #print 'startVal:', value
+        valCnt = 0
+        while valCnt < len(value):
+            if len(value[valCnt]) > 0:
+                if value[valCnt][0] == '"' or value[valCnt][0] == "'":
+                    value[valCnt] = value[valCnt][1:]
+                if value[valCnt][len(value[valCnt]) - 1] == '"' or value[valCnt][len(value[valCnt]) - 1] == "'":
+                    value[valCnt] = value[valCnt][:len(value[valCnt]) - 1]
+            valCnt += 1
+        #print 'retVal:', value
+        return value
     
 class neticaEdge(object):
     '''
@@ -454,10 +560,52 @@ class neticaEdge(object):
     
 class FuncTable(object):
     
-    def __init__(self, parentColumns, outcomeValues, parentValues):
+    def __init__(self, parentColumns, outcomeValues, parentValues, levels, states):
         self.parentColumns = parentColumns
         self.outcomeValues = outcomeValues
         self.parentValues = parentValues
+        self.levels = levels
+        
+    def getLikelyHoodTable(self):
+        '''
+        atribLoL ([], ['LU_hazard', 'Population_risk'])
+        parentColumns ['LU_hazard', 'Population_risk']
+        outcomeValues ['#0', '#1', '#2', '#3', '#4', '#1', '#1', '#2', '#3', '#4', '#2', '#2', '#2', '#3', '#4', '#3', '#3', '#3', '#3', '#4', '#4', '#4', '#4', '#4', '#4']
+        parentValues [['None', 'None'], ['None', 'Low'], ['None', 'Moderate-low'], ['None', 'Moderate-high'], ['None', 'High'], ['Low', 'None'], ['Low', 'Low'], ['Low', 'Moderate-low'], ['Low', 'Moderate-high'], ['Low', 'High'], ['Moderate-low', 'None'], ['Moderate-low', 'Low'], ['Moderate-low', 'Moderate-low'], ['Moderate-low', 'Moderate-high'], ['Moderate-low', 'High'], ['Moderate-high', 'None'], ['Moderate-high', 'Low'], ['Moderate-high', 'Moderate-low'], ['Moderate-high', 'Moderate-high'], ['Moderate-high', 'High'], ['High', 'None'], ['High', 'Low'], ['High', 'Moderate-low'], ['High', 'Moderate-high'], ['High', 'High']]
+        '''
+        # characters to remove
+        leadingCharsToDel = ['#']
+        skipVals = ['@imposs']
+        allProbs = []
+        for outcome in self.outcomeValues:
+            for char2Del in leadingCharsToDel:
+                if outcome[0] == char2Del:
+                    outcome = outcome[1:]
+                    break
+            skip = False
+            for skipVal in skipVals:
+                if skipVal == outcome:
+                    skip = True
+                    break
+            if skip:
+                continue
+            # if there is a levels value then the values indicate levels
+            # otherwise they are something else
+            # ASSUMING THE SOURCE NODE IS NATURE, MORE CODE REQUIRED HERE.  FUNCTION TABLE
+            # COULD ALSO BE UTILIITY
+            print 'outcome', outcome
+            probs = [0] * len(self.levels)
+            probs[int(outcome)] = 1
+            allProbs.append(probs)
+        return allProbs
+    
+    def getParentValuesTable(self):
+        return self.parentValues
+        
+    def printTable(self):
+        print 'parentColumns', self.parentColumns
+        print 'outcomeValues', self.outcomeValues
+        print 'parentValues', self.parentValues
            
 class ProbsValueTable(object):
     '''
@@ -525,7 +673,7 @@ class ProbsValueTable(object):
         self.parentColumns = parentColumns
         self.valueStruct = []
         self.parentValueStruct = []
-        self.struct = {}
+#         self.struct = {}
         
     def __initLogging(self):
         '''
@@ -567,7 +715,7 @@ class ProbsValueTable(object):
             probValue =  1.0 / len(self.states)
             self.valueStruct = [probValue]
             self.valueStruct = self.valueStruct * len(self.states)
-            print 'valueStruct', self.valueStruct
+            #print 'valueStruct', self.valueStruct
         
     def getLikelyHoodTable(self):
         '''
@@ -658,9 +806,7 @@ class ProbsValueTable(object):
 #             rowCnt += 1
 #         print 'self.struct', self.struct
         self.logger.debug("finished")
-        
- 
-            
+                   
 class netica2OpenBayes(object):
     '''
     This class provides the glue between the neticaNet class and the 
@@ -735,24 +881,34 @@ class netica2OpenBayes(object):
             
             
             probTab = neticaNode.getProbabilityTable()
-            self.logger.debug("Probability Table:" + str(probTab))
+            self.logger.debug("Probability Table - parentColumns:" + str(probTab.parentColumns))
+            self.logger.debug("Probability Table - valueStruct:" + str(probTab.valueStruct))
+            self.logger.debug("Probability Table - parentValueStruct:" + str(probTab.parentValueStruct))
+            self.logger.debug("Probability Table - states:" + str(probTab.states))
+
             likelyHoodTable = probTab.getLikelyHoodTable()
             openBayesVertex = self.OpenBayesNodesDict[rootNodeName]
             openBayesVertex.setDistributionParameters(likelyHoodTable)
         
         # Entering the distribution tables for non root nodes.
         nonRootNodeNames = self.neticaNetwork.getNonRootNodeNames()
-        print 'nonRootNodeNames:', nonRootNodeNames
+        #print 'nonRootNodeNames:', nonRootNodeNames
         for nodeName in nonRootNodeNames:
             neticaNode = self.neticaNetwork.getNode(nodeName)
             openBayesVertex = self.OpenBayesNodesDict[nodeName]
             parentLookup = self.__assembleParentLookup(neticaNode)
             parentNames = neticaNode.getParentNames()
             probTab = neticaNode.getProbabilityTable()
-            if probTab:
+            funcTab = neticaNode.getFunctionTable()
+            print 'nodeName:', nodeName
+            if funcTab:
+                print 'loading the func table'
+                likelyhoods = funcTab.getLikelyHoodTable()
+                parentValues = funcTab.getParentValuesTable()
+            elif probTab:
                 likelyhoods = probTab.getLikelyHoodTable()
                 parentValues = probTab.getParentValuesTable()
-                
+            
             else:
                 likelyhoods = None
                 parentValues = None
@@ -774,7 +930,7 @@ class netica2OpenBayes(object):
                         dict2Make[parentNames[parentValCnter]] = parentLookup[ parentNames[parentValCnter]][parentVal]
                         #dictRef = dictRef[parentVal]
                         parentValCnter += 1
-                    print 'dict2Make', dict2Make, likelyhoods[counter]
+                    #print 'dict2Make', dict2Make, likelyhoods[counter]
                     #print 'position:', dictRef
                     #print 'likelyhood', likelyhoods[counter][dictRef]
                     
@@ -793,9 +949,7 @@ class netica2OpenBayes(object):
             the networks that are being modelled for cumulative effects are unlikely to 
             have decision nodes.
             
-            
             '''
-            print 'hi'
              
     def __assembleParentLookup(self, neticaNode):
         '''
@@ -886,15 +1040,19 @@ class netica2OpenBayes(object):
         Uses the nodes parent property to determine what nodes
         / verticies the edge should connect.
         '''
-        nodeNames = self.neticaNetwork.getRootNodeNames()
-        self.logger.debug("nodeNames: " + str(nodeNames))
+        #nodeNames = self.neticaNetwork.getRootNodeNames()
+        nodeNames = self.neticaNetwork.getAllNodeNames()
+        self.logger.debug("root nodes in __loadEdges (" + str(nodeNames) + ')')
+        #self.logger.debug("nodeNames: " + str(nodeNames))
         for nodeName in nodeNames:
             node = self.neticaNetwork.getNode(nodeName)
-            parentNodeNames = node.getParentNames()
-            for parentNodeName in parentNodeNames:
+            childNodeNames = self.neticaNetwork.getChildNodeNames(nodeName)
+            self.logger.debug("child of (" + str(nodeName) + ") are " + str(childNodeNames))
+            for childNodeName in childNodeNames:
                 #parentNode = self.neticaNetwork.getNode(parentNodeName)
+                self.logger.debug("Adding an Edge from node (" + str(nodeName) + ") to node (" + str(childNodeName) + ')')
                 srcVertex = self.OpenBayesNodesDict[nodeName]
-                destVertex = self.OpenBayesNodesDict[parentNodeName]
+                destVertex = self.OpenBayesNodesDict[childNodeName]
                 edge = OpenBayes.DirEdge(len(self.OpenBayesNetwork.e), srcVertex, destVertex)
                 self.OpenBayesNetwork.add_e(edge)
         
@@ -907,6 +1065,16 @@ class netica2OpenBayes(object):
         for nodeName in self.neticaNetwork.getAllNodeNames():
             nodeObj = self.neticaNetwork.getNode(nodeName)
             isDiscrete = nodeObj.isDiscrete()
+            if not isDiscrete:                
+                warnMessage = 'The netica file has labelled the node (' + str(nodeName) + ') as not discrete however' + \
+                              'it is likely being treated by netica as discrete and not continuous data. ' + \
+                              'Going to treat it as if it is discrete data when it is loaded '  + \
+                              'into the OpenBayes framework.  If this is an error, you should ' + \
+                              'edit this portion of the loader module!' 
+                              
+                self.logger.warn(warnMessage)
+                warnings.warn(warnMessage)
+                isDiscrete = True
             if isDiscrete:
                 states = len(nodeObj.getStates())
             else:

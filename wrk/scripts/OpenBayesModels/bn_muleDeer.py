@@ -197,6 +197,7 @@ for vert in network.topological_sort():
 
 print network
 jTree = JoinTree(network)
+
 # marginalize: Given a joint distribution, we can compute the distributions of each variable
 #independently, which are called the marginal distributions.
 margResults = jTree.MarginaliseAll()

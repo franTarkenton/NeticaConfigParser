@@ -3,9 +3,11 @@ Created on Sep 25, 2013
 
 @author: kjnether
 '''
-import DNETParser
 import os
 import unittest
+
+import DNETParser
+from neticaParser import NeticaData
 
 
 class TestBayesParser(unittest.TestCase):
@@ -14,9 +16,13 @@ class TestBayesParser(unittest.TestCase):
     def setUp(self):
         dataDir = r'W:\ilmb\vic\geobc\bier\p14\p14_0053_BBN_CumEffects\wrk\netica_data'
         justFile = r'Car_Buyer.dnet.txt'
+        muleDeer = r'Mule deer model 6.dnet.txt.dne'
+        self.muleDeerFullPath = os.path.join(dataDir, muleDeer)
         self.testFile = os.path.join(dataDir, justFile)
         self.dnetParser = DNETParser.DNETStructParser(self.testFile)
         self.multilineString1 = 'probs = \n // Peach        Lemon\n (0.8,         0.2);'
+        self.multilineString1_1 = 'probs = \n        // Present      Not present  \n          (0.5,         0.5);'
+        #self.multilineString1_2 =     'probs =\n        // Present      Not present\n            (0.5,         0.5);'
         self.multilineString2 = 'probs = \n // NoResult     NoDefects    OneDefect    TwoDefects      // T1           CC    \n' + \
                            '(((1,           0,           0,           0),             // NoTest       Peach \n' + \
                            '(1,           0,           0,           0)),            // NoTest       Lemon \n' + \
@@ -255,13 +261,25 @@ class TestBayesParser(unittest.TestCase):
     def test_ParseBayesNet__parseSingleListMultiLineProbAttribute(self):
         struct = self.dnetParser.getNodeStartendLines()
         parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
-        parseBayesNet._ParseBayesNet__parseSingleListMultiLineProbAttribute(self.multilineString1)
+        nodeObj = NeticaData.neticaNode()
+        nodeObj.enterAndValidateSimpleAttribute("statetitles", ["Present", "Not present"])
 
+        #parseBayesNet._ParseBayesNet__parseSingleListMultiLineProbAttribute(self.multilineString1)
+        data = parseBayesNet._ParseBayesNet__parseSingleListMultiLineProbAttribute(self.multilineString1_1, nodeObj)
+        #data = parseBayesNet._ParseBayesNet__parseSingleListMultiLineProbAttribute(self.multilineString1_2)
+#         print 'inputLines:', self.multilineString1_1
+#         print 'parents:', data.getParentValuesTable()
+#         print 'likelyhoods:', data.getLikelyHoodTable()
+        
     def test_ParseBayesNet__parseFuncTableMultiLineAttribute(self):
         struct = self.dnetParser.getNodeStartendLines()
         parseBayesNet = DNETParser.ParseBayesNet(struct, self.testFile)
-        parseBayesNet._ParseBayesNet__parseFuncTableMultiLineAttribute(self.multilineFuncTable1)
-        
+        nodeObj = NeticaData.neticaNode()
+        nodeObj.enterAndValidateSimpleAttribute("statetitles", ["None", "Low", "Moderate-low", "Moderate-high", "High"])
+        nodeObj.enterAndValidateSimpleAttribute("levels", [0, 1, 2, 3, 4])
+        neticaFuncTab = parseBayesNet._ParseBayesNet__parseFuncTableMultiLineAttribute(self.multilineFuncTable1, nodeObj)
+        likely = neticaFuncTab.getLikelyHoodTable()
+        print 'likely', likely
         
     def test_ParseBayesNet_DataVerification(self):
         '''
@@ -274,7 +292,15 @@ class TestBayesParser(unittest.TestCase):
         neticaDataStruct = bayesParser.getBayesDataObj()
         neticaDataStruct.getRootNodeNames()
         
-
+    def test_MuleDeerData(self):
+        self.muleDeerFullPath
+        parser = DNETParser.DNETStructParser(self.muleDeerFullPath)
+        neticaParser = parser.populateBayesParams()
+        neticaObj = neticaParser.getBayesDataObj()
+        
+        #neticaLoader = NeticaData.netica2OpenBayes(self.neticaObj)
+        #neticaLoader.loadData()
+        #openBayesObj = neticaLoader.getOpenBayesNetwork()
 
         
 if __name__ == "__main__":
@@ -284,5 +310,5 @@ if __name__ == "__main__":
     # run a single test
         # run selected tests that are added using addTest
     testSuite = unittest.TestSuite()
-    testSuite.addTest(TestBayesParser('test_ParseBayesNet__getNeticaProbabilityObject'))
+    testSuite.addTest(TestBayesParser('test_ParseBayesNet__parseFuncTableMultiLineAttribute'))
     unittest.TextTestRunner(verbosity=2).run(testSuite)
